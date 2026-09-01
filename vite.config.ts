@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react(), wasm()],
   build: {
     target: 'esnext',
+    chunkSizeWarningLimit: 2000,
   },
   esbuild: {
     target: 'esnext',
