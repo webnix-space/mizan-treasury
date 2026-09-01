@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
 import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
+
+// Top-level global initialization of Midnight Preprod network ID
+try {
+  setNetworkId('TestNet');
+} catch (e) {
+  console.warn('Network ID initialization:', e);
+}
 
 function inMemoryPrivateStateProvider() {
   const store = new Map<string, any>();
@@ -22,6 +30,10 @@ export default function DeployPage() {
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
+    try {
+      setNetworkId('TestNet');
+    } catch (_) {}
+
     const midnight = (window as any).midnight;
     if (midnight) {
       const detected = Object.keys(midnight).map((k) => ({
@@ -38,6 +50,10 @@ export default function DeployPage() {
       setLoading(true);
       setStatus('Connecting to Midnight / 1AM Wallet...');
 
+      try {
+        setNetworkId('TestNet');
+      } catch (_) {}
+
       const midnight = (window as any).midnight;
       if (!midnight) {
         throw new Error('Midnight compatible wallet (1AM / Lace) extension not found in window.midnight.');
@@ -48,17 +64,6 @@ export default function DeployPage() {
       if (!entry) throw new Error(`Selected wallet ${walletKey} is unavailable.`);
 
       const api = typeof entry.enable === 'function' ? await entry.enable() : entry;
-
-      // Ensure networkId initialization if present on API or fallback safely
-      if (typeof api.getNetworkId === 'function') {
-        const netId = await api.getNetworkId();
-        try {
-          const netPkg: any = await import('@midnight-ntwrk/midnight-js-network-id');
-          if (typeof netPkg.setNetworkId === 'function') {
-            netPkg.setNetworkId(netId || 'undeployed');
-          }
-        } catch (_) {}
-      }
 
       const walletProvider = api.walletProvider || {
         getCoinPublicKey: api.getCoinPublicKey ? () => api.getCoinPublicKey() : (api.state ? async () => (await api.state()).coinPublicKey : () => null),
