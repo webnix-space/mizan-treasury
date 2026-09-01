@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import * as NetworkIdPkg from '@midnight-ntwrk/midnight-js-network-id';
+import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
 import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
 
-// Top-level NetworkId initialization using raw enum value
+// Initialize network ID globally at module evaluation
 try {
-  const pkg: any = NetworkIdPkg;
-  const net = pkg.NetworkId?.TestNet ?? pkg.NetworkId?.Undeployed ?? 'undeployed';
-  if (typeof pkg.setNetworkId === 'function') {
-    pkg.setNetworkId(net);
-  }
+  setNetworkId('undeployed');
 } catch (_) {}
 
 function inMemoryPrivateStateProvider() {
@@ -24,7 +20,7 @@ function inMemoryPrivateStateProvider() {
 }
 
 export default function DeployPage() {
-  const [status, setStatus] = useState<string>('Ready for interaction');
+  const [status, setStatus] = useState<string>('Ready to deploy');
   const [wallets, setWallets] = useState<{ id: string; name: string }[]>([]);
   const [selectedWallet, setSelectedWallet] = useState<string>('');
   const [contractAddress, setContractAddress] = useState<string>('');
@@ -32,15 +28,6 @@ export default function DeployPage() {
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    // Suppress external wallet / MetaMask unhandled promise rejection banners
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      const reason = String(event.reason || '');
-      if (reason.toLowerCase().includes('metamask') || reason.toLowerCase().includes('ethereum')) {
-        event.preventDefault();
-      }
-    };
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
     const midnight = (window as any).midnight;
     if (midnight) {
       const detected = Object.keys(midnight).map((k) => ({
@@ -50,16 +37,12 @@ export default function DeployPage() {
       setWallets(detected);
       if (detected.length > 0) setSelectedWallet(detected[0].id);
     }
-
-    return () => {
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
   }, []);
 
   const handleDeploy = async () => {
     try {
       setLoading(true);
-      setStatus('Connecting to Midnight / 1AM Wallet...');
+      setStatus('Connecting to 1AM Wallet...');
 
       const midnight = (window as any).midnight;
       if (!midnight) {
@@ -72,39 +55,44 @@ export default function DeployPage() {
 
       const api = typeof entry.enable === 'function' ? await entry.enable() : entry;
 
-      const walletProvider = api.walletProvider || {
-        getCoinPublicKey: api.getCoinPublicKey ? () => api.getCoinPublicKey() : (api.state ? async () => (await api.state()).coinPublicKey : () => null),
-        getEncryptionPublicKey: api.getEncryptionPublicKey ? () => api.getEncryptionPublicKey() : (api.state ? async () => (await api.state()).encryptionPublicKey : () => null),
-        balanceTx: api.balanceTx ? api.balanceTx.bind(api) : api.balanceTransaction?.bind(api),
-      };
+      if (typeof api.getNetworkId === 'function') {
+        const net = await api.getNetworkId();
+        if (net) {
+          try {
+            setNetworkId(net);
+          } catch (_) {}
+        }
+      }
 
       const providers = {
         privateStateProvider: inMemoryPrivateStateProvider(),
         publicDataProvider: api.publicDataProvider,
-        zkConfigProvider: { getZkConfig: async () => ({ proverKey: async () => new Uint8Array(), verifierKey: async () => new Uint8Array() }) },
+        zkConfigProvider: api.zkConfigProvider || {
+          getZkConfig: async () => ({ proverKey: async () => new Uint8Array(), verifierKey: async () => new Uint8Array() })
+        },
         proofProvider: api.proofProvider,
-        walletProvider,
-        midnightProvider: api.midnightProvider,
+        walletProvider: api.walletProvider || api,
+        midnightProvider: api.midnightProvider || api,
       };
 
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('Submitting Zero-Knowledge transaction to wallet...');
+      setStatus('Submitting ZK proof transaction to 1AM wallet for signing...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
         args: [1_000_000n],
-        privateStateKey: 'treasuryPrivateState',
+        privateStateKey: 'treasuryVaultPrivateState',
         initialPrivateState: {},
       });
 
-      const addr = deployed.deployTxData?.public?.contractAddress || (deployed as any).contractAddress || 'Confirmed on Midnight Preprod';
+      const addr = deployed.deployTxData?.public?.contractAddress || (deployed as any).contractAddress || 'Confirmed on-chain';
       const hash = deployed.deployTxData?.public?.txHash || (deployed as any).txHash || '';
 
       setContractAddress(addr);
       setTxHash(hash);
-      setStatus('Treasury Vault deployed successfully on Midnight Preprod!');
+      setStatus('Vault deployed successfully on Midnight Preprod!');
     } catch (err: any) {
       setStatus(`Execution Error: ${err.message || String(err)}`);
     } finally {
@@ -114,13 +102,13 @@ export default function DeployPage() {
 
   return (
     <div style={{ padding: '2rem', fontFamily: 'monospace', maxWidth: '650px', margin: '0 auto', color: '#fff' }}>
-      <h1>Mizan Treasury Preprod Deployer</h1>
-      
+      <h1 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Mizan Treasury Preprod Deployer</h1>
+
       {wallets.length > 0 ? (
         <select
           value={selectedWallet}
           onChange={(e) => setSelectedWallet(e.target.value)}
-          style={{ padding: '0.6rem', marginBottom: '1.2rem', width: '100%', background: '#1e293b', color: '#fff', border: '1px solid #475569', borderRadius: '6px' }}
+          style={{ padding: '0.65rem', marginBottom: '1.2rem', width: '100%', background: '#1e293b', color: '#fff', border: '1px solid #475569', borderRadius: '6px' }}
         >
           {wallets.map((w) => (
             <option key={w.id} value={w.id}>{w.name}</option>
