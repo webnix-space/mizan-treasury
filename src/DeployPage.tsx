@@ -4,9 +4,14 @@ import { CompiledContract } from '@midnight-ntwrk/compact-js';
 import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
 
+// Top-level Network ID initialization for Midnight Preprod
 try {
-  setNetworkId('undeployed');
-} catch (_) {}
+  setNetworkId('testnet');
+} catch (_) {
+  try {
+    setNetworkId('undeployed');
+  } catch (_) {}
+}
 
 function inMemoryPrivateStateProvider() {
   const store = new Map<string, any>();
@@ -18,6 +23,20 @@ function inMemoryPrivateStateProvider() {
   };
 }
 
+// Safely extract a pure string key from any wallet payload format
+function extractStringKey(val: any): string | null {
+  if (!val) return null;
+  if (typeof val === 'string' && val.trim().length > 0) return val.trim();
+  if (typeof val === 'object') {
+    if (typeof val.bech32 === 'string') return val.bech32;
+    if (typeof val.address === 'string') return val.address;
+    if (typeof val.data === 'string') return val.data;
+    if (typeof val.value === 'string') return val.value;
+    if (typeof val.key === 'string') return val.key;
+  }
+  return null;
+}
+
 export default function DeployPage() {
   const [status, setStatus] = useState<string>('Ready to deploy');
   const [wallets, setWallets] = useState<{ id: string; name: string }[]>([]);
@@ -25,6 +44,7 @@ export default function DeployPage() {
   const [contractAddress, setContractAddress] = useState<string>('');
   const [txHash, setTxHash] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [diagInfo, setDiagInfo] = useState<string>('');
 
   useEffect(() => {
     const midnight = (window as any).midnight;
@@ -41,7 +61,8 @@ export default function DeployPage() {
   const handleDeploy = async () => {
     try {
       setLoading(true);
-      setStatus('Connecting to 1AM Wallet DApp Connector v4...');
+      setDiagInfo('');
+      setStatus('1/4: Requesting 1AM Wallet DApp connection...');
 
       const midnight = (window as any).midnight;
       if (!midnight) {
@@ -52,70 +73,108 @@ export default function DeployPage() {
       const entry = midnight[walletKey];
       if (!entry) throw new Error(`Wallet ${walletKey} not available.`);
 
-      // 1. Enable 1AM DApp connector API
+      // 1. Enable 1AM connector
       const api = typeof entry.enable === 'function' ? await entry.enable() : entry;
 
-      // 2. Extract network ID & sync SDK codec
-      if (typeof api.getNetworkId === 'function') {
-        const net = await api.getNetworkId();
-        if (net) {
-          try {
-            setNetworkId(net);
-          } catch (_) {}
-        }
+      // 2. Fetch full state from wallet API
+      let state: any = {};
+      if (typeof api.state === 'function') {
+        state = await api.state();
+      } else if (api.state && typeof api.state.subscribe === 'function') {
+        state = await new Promise((resolve) => {
+          const sub = api.state.subscribe({
+            next: (s: any) => {
+              if (s) {
+                if (sub && sub.unsubscribe) sub.unsubscribe();
+                resolve(s);
+              }
+            },
+            error: () => resolve({}),
+          });
+          setTimeout(() => resolve({}), 2000);
+        });
+      } else if (api.state) {
+        state = api.state;
       }
 
-      // 3. Construct 1AM standard providers bundle
-      let providers = api.providers;
-      if (!providers) {
-        let state = {};
-        if (typeof api.state === 'function') {
-          state = await api.state();
-        } else if (api.state) {
-          state = api.state;
-        }
+      // 3. Extract coin and encryption public keys
+      let coinPk =
+        extractStringKey(state?.coinPublicKey) ||
+        extractStringKey(state?.address) ||
+        extractStringKey(state?.bech32Address) ||
+        extractStringKey(typeof api.getCoinPublicKey === 'function' ? await api.getCoinPublicKey() : null) ||
+        extractStringKey(api.coinPublicKey) ||
+        (api.walletProvider && extractStringKey(typeof api.walletProvider.getCoinPublicKey === 'function' ? await api.walletProvider.getCoinPublicKey() : null));
 
-        const coinPublicKey = (state as any).coinPublicKey || (typeof api.getCoinPublicKey === 'function' ? await api.getCoinPublicKey() : null) || 'undeployed';
-        const encryptionPublicKey = (state as any).encryptionPublicKey || (typeof api.getEncryptionPublicKey === 'function' ? await api.getEncryptionPublicKey() : null) || coinPublicKey;
+      let encPk =
+        extractStringKey(state?.encryptionPublicKey) ||
+        extractStringKey(state?.encPublicKey) ||
+        extractStringKey(typeof api.getEncryptionPublicKey === 'function' ? await api.getEncryptionPublicKey() : null) ||
+        extractStringKey(api.encryptionPublicKey) ||
+        (api.walletProvider && extractStringKey(typeof api.walletProvider.getEncryptionPublicKey === 'function' ? await api.walletProvider.getEncryptionPublicKey() : null));
 
-        providers = {
-          privateStateProvider: inMemoryPrivateStateProvider(),
-          publicDataProvider: api.publicDataProvider,
-          zkConfigProvider: api.zkConfigProvider || {
-            getZkConfig: async () => ({ proverKey: async () => new Uint8Array(), verifierKey: async () => new Uint8Array() })
-          },
-          proofProvider: api.proofProvider,
-          walletProvider: api.walletProvider || {
-            getCoinPublicKey: async () => coinPublicKey,
-            getEncryptionPublicKey: async () => encryptionPublicKey,
-            balanceTx: api.balanceTx ? api.balanceTx.bind(api) : (api.balanceTransaction ? api.balanceTransaction.bind(api) : async (tx: any) => tx),
-          },
-          midnightProvider: api.midnightProvider || api,
-        };
+      // Fallback: If wallet only exposes addresses array
+      if (!coinPk && typeof api.getAddresses === 'function') {
+        const addrs = await api.getAddresses();
+        if (addrs && addrs.length > 0) coinPk = extractStringKey(addrs[0]);
       }
 
-      if (!providers.privateStateProvider) {
-        providers.privateStateProvider = inMemoryPrivateStateProvider();
+      if (!coinPk) {
+        const dump = JSON.stringify({ apiKeys: Object.keys(api), stateKeys: Object.keys(state) });
+        setDiagInfo(`Wallet state dump: ${dump}`);
+        throw new Error('1AM wallet did not return Bech32 coin public keys. Please open 1AM, ensure account is created/selected on Preprod, and unlock it.');
       }
+
+      if (!encPk) encPk = coinPk;
+
+      setDiagInfo(`Connected PK: ${coinPk.slice(0, 16)}...`);
+      setStatus('2/4: Preparing ZK contract artifacts...');
+
+      // 4. Wrap strictly typed wallet provider
+      const walletProvider = {
+        coinPublicKey: coinPk,
+        encryptionPublicKey: encPk,
+        getCoinPublicKey: async () => coinPk as string,
+        getEncryptionPublicKey: async () => encPk as string,
+        balanceTx: async (tx: any, ttl?: any) => {
+          if (typeof api.balanceTx === 'function') return api.balanceTx(tx, ttl);
+          if (typeof api.balanceTransaction === 'function') return api.balanceTransaction(tx, ttl);
+          if (api.walletProvider && typeof api.walletProvider.balanceTx === 'function') {
+            return api.walletProvider.balanceTx(tx, ttl);
+          }
+          return tx;
+        },
+      };
+
+      const providers = {
+        privateStateProvider: inMemoryPrivateStateProvider(),
+        publicDataProvider: api.publicDataProvider,
+        zkConfigProvider: api.zkConfigProvider || {
+          getZkConfig: async () => ({ proverKey: async () => new Uint8Array(), verifierKey: async () => new Uint8Array() })
+        },
+        proofProvider: api.proofProvider,
+        walletProvider,
+        midnightProvider: api.midnightProvider || api,
+      };
 
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('Submitting Zero-Knowledge deployment transaction to 1AM...');
+      setStatus('3/4: Generating witness proofs & waiting for 1AM wallet signature...');
 
-      const deployed = await deployContract(providers, {
+      const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
         args: [1_000_000n],
         privateStateKey: 'treasuryVaultPrivateState',
         initialPrivateState: {},
       });
 
-      const addr = deployed.deployTxData?.public?.contractAddress || (deployed as any).contractAddress || 'Confirmed on-chain';
+      const addr = deployed.deployTxData?.public?.contractAddress || (deployed as any).contractAddress || 'Confirmed on Midnight Preprod';
       const hash = deployed.deployTxData?.public?.txHash || (deployed as any).txHash || '';
 
       setContractAddress(addr);
       setTxHash(hash);
-      setStatus('Treasury Vault deployed successfully on Midnight Preprod!');
+      setStatus('4/4: Vault successfully deployed on-chain!');
     } catch (err: any) {
       setStatus(`Execution Error: ${err.message || String(err)}`);
     } finally {
@@ -159,6 +218,10 @@ export default function DeployPage() {
       </button>
 
       <p style={{ marginTop: '1.2rem', wordBreak: 'break-all', color: '#94a3b8', fontSize: '0.95rem' }}>{status}</p>
+
+      {diagInfo && (
+        <p style={{ fontSize: '0.8rem', color: '#64748b', wordBreak: 'break-all' }}>{diagInfo}</p>
+      )}
 
       {contractAddress && (
         <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#064e3b', borderRadius: '6px', border: '1px solid #059669' }}>
