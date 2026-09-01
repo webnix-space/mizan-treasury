@@ -4,7 +4,7 @@ import { CompiledContract } from '@midnight-ntwrk/compact-js';
 import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
 
-// Initialize network ID globally at module evaluation
+// Global Network ID setup
 try {
   setNetworkId('undeployed');
 } catch (_) {}
@@ -53,8 +53,10 @@ export default function DeployPage() {
       const entry = midnight[walletKey];
       if (!entry) throw new Error(`Wallet ${walletKey} not available.`);
 
+      // Enable DApp connector
       const api = typeof entry.enable === 'function' ? await entry.enable() : entry;
 
+      // Extract network if available
       if (typeof api.getNetworkId === 'function') {
         const net = await api.getNetworkId();
         if (net) {
@@ -64,6 +66,42 @@ export default function DeployPage() {
         }
       }
 
+      // Resolve state / public keys across different Midnight wallet versions
+      let state: any = {};
+      if (typeof api.state === 'function') {
+        state = await api.state();
+      } else if (api.state) {
+        state = api.state;
+      }
+
+      const coinPublicKey =
+        state.coinPublicKey ||
+        (typeof api.getCoinPublicKey === 'function' ? await api.getCoinPublicKey() : null) ||
+        (api.walletProvider && typeof api.walletProvider.getCoinPublicKey === 'function' ? await api.walletProvider.getCoinPublicKey() : null);
+
+      const encryptionPublicKey =
+        state.encryptionPublicKey ||
+        (typeof api.getEncryptionPublicKey === 'function' ? await api.getEncryptionPublicKey() : null) ||
+        (api.walletProvider && typeof api.walletProvider.getEncryptionPublicKey === 'function' ? await api.walletProvider.getEncryptionPublicKey() : null);
+
+      if (!coinPublicKey || !encryptionPublicKey) {
+        throw new Error('Please ensure your 1AM wallet is unlocked, has a created account, and is connected.');
+      }
+
+      // Construct compliant wallet provider bridge
+      const walletProvider = {
+        coinPublicKey,
+        encryptionPublicKey,
+        getCoinPublicKey: async () => coinPublicKey,
+        getEncryptionPublicKey: async () => encryptionPublicKey,
+        balanceTx: async (tx: any, ttl?: any) => {
+          if (typeof api.balanceTx === 'function') return api.balanceTx(tx, ttl);
+          if (typeof api.balanceTransaction === 'function') return api.balanceTransaction(tx, ttl);
+          if (api.walletProvider && typeof api.walletProvider.balanceTx === 'function') return api.walletProvider.balanceTx(tx, ttl);
+          throw new Error('Wallet does not support transaction balancing.');
+        },
+      };
+
       const providers = {
         privateStateProvider: inMemoryPrivateStateProvider(),
         publicDataProvider: api.publicDataProvider,
@@ -71,14 +109,14 @@ export default function DeployPage() {
           getZkConfig: async () => ({ proverKey: async () => new Uint8Array(), verifierKey: async () => new Uint8Array() })
         },
         proofProvider: api.proofProvider,
-        walletProvider: api.walletProvider || api,
+        walletProvider,
         midnightProvider: api.midnightProvider || api,
       };
 
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('Submitting ZK proof transaction to 1AM wallet for signing...');
+      setStatus('Submitting Zero-Knowledge transaction to 1AM wallet...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
@@ -87,7 +125,7 @@ export default function DeployPage() {
         initialPrivateState: {},
       });
 
-      const addr = deployed.deployTxData?.public?.contractAddress || (deployed as any).contractAddress || 'Confirmed on-chain';
+      const addr = deployed.deployTxData?.public?.contractAddress || (deployed as any).contractAddress || 'Confirmed on Midnight Preprod';
       const hash = deployed.deployTxData?.public?.txHash || (deployed as any).txHash || '';
 
       setContractAddress(addr);
