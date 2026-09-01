@@ -6,7 +6,8 @@
     "deploy": "tsx --max-old-space-size=4096 src/deploy.ts",
     "dev": "vite",
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
-    "compile": "compact compile contracts/TreasuryVault.compact contracts/managed/TreasuryVault"
+    "compile": "compact compile contracts/TreasuryVault.compact contracts/managed/TreasuryVault",
+    "build": "vite build"
   },
   "dependencies": {
     "@midnight-ntwrk/compact-js": "^2.5.1",

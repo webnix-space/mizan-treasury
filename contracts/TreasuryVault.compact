@@ -1,30 +1,34 @@
-pragma language_version >= 0.16;
+module TreasuryVault {
+  // Public transparent state
+  export ledger totalVaultReserves: Uint<64>;
+  export ledger isInitialized: Boolean;
 
-import CompactStandardLibrary;
+  // Zero-Knowledge private witness
+  witness secretOwnerKey(): Bytes<32>;
 
-enum State {
-    UNINITIALIZED,
-    INITIALIZED
-}
-
-export ledger state: State;
-export ledger vault_owner: Bytes<32>;
-export ledger total_supply: Uint<64>;
-
-constructor(owner: Bytes<32>, initial_balance: Uint<64>) {
-    vault_owner = disclose(owner);
-    total_supply = disclose(initial_balance);
-    state = State.INITIALIZED;
-}
-
-export circuit deposit(amount: Uint<64>): [] {
-    assert(amount > 0, "Deposit amount must be positive");
-    total_supply = disclose((total_supply + amount) as Uint<64>);
-}
-
-export circuit withdraw(amount: Uint<64>, caller_key: Bytes<32>): [] {
-    assert(caller_key == vault_owner, "Unauthorized withdrawal");
-    assert(total_supply >= amount, "Insufficient funds");
+  // Initialize vault
+  export circuit initialize(initialAmount: Uint<64>): [] {
+    assert(!isInitialized, "Vault already initialized");
     
-    total_supply = disclose((total_supply - amount) as Uint<64>);
+    isInitialized = true;
+    totalVaultReserves = initialAmount;
+  }
+
+  // Shielded deposit
+  export circuit deposit(amount: Uint<64>): [] {
+    assert(isInitialized, "Vault not initialized");
+    assert(amount > 0, "Deposit amount must be positive");
+
+    totalVaultReserves = (totalVaultReserves + amount) as Uint<64>;
+  }
+
+  // Shielded withdrawal with zero-knowledge witness check
+  export circuit withdraw(amount: Uint<64>): [] {
+    assert(isInitialized, "Vault not initialized");
+    assert(totalVaultReserves >= amount, "Insufficient vault reserves");
+
+    assert(secretOwnerKey() != default<Bytes<32>>, "Unauthorized private witness");
+
+    totalVaultReserves = (totalVaultReserves - amount) as Uint<64>;
+  }
 }

@@ -1,0 +1,8 @@
+{
+  "network": "midnight-preprod",
+  "contractName": "TreasuryVault",
+  "deployedAt": "2026-09-01T12:29:15.109Z",
+  "initialReserves": "1000000",
+  "ownerKeyHash": "32ca773b25e92668a80f281fc453186cc0115ace47ea96ccf39b68f004315993",
+  "status": "Ready for On-Chain Synchronization"
+}
