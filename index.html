@@ -2,17 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Mizan Treasury Preprod Deployer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mizan Treasury — Midnight Preprod Vault</title>
     <script>
-      window.addEventListener('error', function(e) {
-        document.body.innerHTML += '<div style="color:red; background:#222; padding:15px; margin:10px; font-family:monospace; border-radius:4px;"><b>Script Error:</b> ' + e.message + '<br><small>' + e.filename + ':' + e.lineno + '</small></div>';
-      });
-      window.addEventListener('unhandledrejection', function(e) {
-        document.body.innerHTML += '<div style="color:orange; background:#222; padding:15px; margin:10px; font-family:monospace; border-radius:4px;"><b>Promise Error:</b> ' + (e.reason?.message || e.reason) + '</div>';
-      });
+      // Intercept and swallow injected EVM provider connection errors immediately
+      window.addEventListener('unhandledrejection', function(event) {
+        if (event.reason && (String(event.reason).includes('MetaMask') || String(event.reason).includes('ethereum'))) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      }, true);
     </script>
   </head>
-  <body style="background: #0f172a; color: #f8fafc; margin: 0; padding: 2rem;">
+  <body style="margin: 0; background-color: #0b0f19; color: #f8fafc;">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
