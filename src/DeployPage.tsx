@@ -1,7 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
 import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
+import * as NetworkIdPkg from '@midnight-ntwrk/midnight-js-network-id';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
+
+// Configure Midnight Preprod Network ID globally
+function ensureNetworkId() {
+  try {
+    const pkg: any = NetworkIdPkg;
+    const targetNet = pkg.NetworkId?.TestNet ?? 'TestNet';
+    if (typeof pkg.setNetworkId === 'function') {
+      pkg.setNetworkId(targetNet);
+    } else if (typeof pkg.default?.setNetworkId === 'function') {
+      pkg.default.setNetworkId(targetNet);
+    }
+  } catch (err) {
+    console.warn('Network ID init warning:', err);
+  }
+}
 
 function inMemoryPrivateStateProvider() {
   const store = new Map<string, any>();
@@ -22,6 +38,7 @@ export default function DeployPage() {
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
+    ensureNetworkId();
     const midnight = (window as any).midnight;
     if (midnight) {
       const detected = Object.keys(midnight).map((k) => ({
@@ -36,10 +53,17 @@ export default function DeployPage() {
   const handleDeploy = async () => {
     try {
       setLoading(true);
-      const midnight = (window as any).midnight;
-      if (!midnight) throw new Error('Midnight/1AM wallet extension required.');
+      ensureNetworkId();
 
-      const entry = midnight[selectedWallet] || midnight[Object.keys(midnight)[0]];
+      const midnight = (window as any).midnight;
+      if (!midnight) {
+        throw new Error('Midnight compatible wallet (1AM / Lace) extension not found in window.midnight.');
+      }
+
+      const walletKey = selectedWallet || Object.keys(midnight)[0];
+      const entry = midnight[walletKey];
+      if (!entry) throw new Error(`Selected wallet ${walletKey} is unavailable.`);
+
       const api = typeof entry.enable === 'function' ? await entry.enable() : entry;
 
       const walletProvider = api.walletProvider || {
@@ -59,6 +83,8 @@ export default function DeployPage() {
 
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
+
+      setStatus('Submitting Zero-Knowledge deployment transaction to 1AM Wallet...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
@@ -80,16 +106,46 @@ export default function DeployPage() {
   return (
     <div style={{ padding: '2rem', fontFamily: 'monospace', maxWidth: '650px', margin: '0 auto', color: '#fff' }}>
       <h1>Mizan Treasury Preprod Deployer</h1>
-      {wallets.length > 0 && (
-        <select value={selectedWallet} onChange={(e) => setSelectedWallet(e.target.value)} style={{ padding: '0.5rem', marginBottom: '1rem', width: '100%', background: '#1e293b', color: '#fff' }}>
-          {wallets.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+      {wallets.length > 0 ? (
+        <select
+          value={selectedWallet}
+          onChange={(e) => setSelectedWallet(e.target.value)}
+          style={{ padding: '0.5rem', marginBottom: '1rem', width: '100%', background: '#1e293b', color: '#fff', border: '1px solid #475569', borderRadius: '4px' }}
+        >
+          {wallets.map((w) => (
+            <option key={w.id} value={w.id}>{w.name}</option>
+          ))}
         </select>
+      ) : (
+        <p style={{ color: '#fbbf24', fontSize: '0.9rem' }}>Searching for connected Midnight wallet extension...</p>
       )}
-      <button onClick={handleDeploy} disabled={loading} style={{ width: '100%', padding: '0.75rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold' }}>
-        {loading ? 'Deploying...' : 'Deploy Production Vault'}
+
+      <button
+        onClick={handleDeploy}
+        disabled={loading}
+        style={{
+          width: '100%',
+          padding: '0.75rem',
+          background: loading ? '#475569' : '#2563eb',
+          color: '#fff',
+          border: 'none',
+          borderRadius: '6px',
+          fontWeight: 'bold',
+          cursor: loading ? 'not-allowed' : 'pointer'
+        }}
+      >
+        {loading ? 'Submitting to Wallet...' : 'Deploy Production Vault'}
       </button>
-      <p style={{ marginTop: '1rem', wordBreak: 'break-all' }}>{status}</p>
-      {contractAddress && <p style={{ color: '#10b981' }}>Contract: {contractAddress}<br />Tx: {txHash}</p>}
+
+      <p style={{ marginTop: '1rem', wordBreak: 'break-all', color: '#cbd5e1' }}>{status}</p>
+
+      {contractAddress && (
+        <div style={{ marginTop: '1rem', padding: '1rem', background: '#064e3b', borderRadius: '6px' }}>
+          <p style={{ color: '#34d399', margin: 0, fontWeight: 'bold' }}>Contract Deployed</p>
+          <p style={{ fontSize: '0.85rem', wordBreak: 'break-all', margin: '0.5rem 0' }}>Address: {contractAddress}</p>
+          <p style={{ fontSize: '0.85rem', wordBreak: 'break-all', margin: 0 }}>Tx: {txHash}</p>
+        </div>
+      )}
     </div>
   );
 }
