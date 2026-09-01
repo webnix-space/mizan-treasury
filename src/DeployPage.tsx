@@ -4,7 +4,6 @@ import { CompiledContract } from '@midnight-ntwrk/compact-js';
 import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
 
-// Global Network ID setup
 try {
   setNetworkId('undeployed');
 } catch (_) {}
@@ -53,42 +52,54 @@ export default function DeployPage() {
       const entry = midnight[walletKey];
       if (!entry) throw new Error(`Wallet ${walletKey} not available.`);
 
-      // Enable DApp connector
+      // 1. Enable connector
       const api = typeof entry.enable === 'function' ? await entry.enable() : entry;
 
-      // Extract network if available
-      if (typeof api.getNetworkId === 'function') {
-        const net = await api.getNetworkId();
-        if (net) {
-          try {
-            setNetworkId(net);
-          } catch (_) {}
+      // 2. Comprehensive key extractor across all Midnight wallet API schemas
+      let coinPublicKey: string | null = null;
+      let encryptionPublicKey: string | null = null;
+
+      // Direct functions
+      if (typeof api.getCoinPublicKey === 'function') coinPublicKey = await api.getCoinPublicKey();
+      if (typeof api.getEncryptionPublicKey === 'function') encryptionPublicKey = await api.getEncryptionPublicKey();
+
+      // State method
+      if (!coinPublicKey && typeof api.state === 'function') {
+        const s = await api.state();
+        coinPublicKey = s?.coinPublicKey || s?.address || s?.bech32Address || null;
+        encryptionPublicKey = s?.encryptionPublicKey || s?.encPublicKey || null;
+      }
+
+      // Direct properties
+      if (!coinPublicKey && api.coinPublicKey) coinPublicKey = api.coinPublicKey;
+      if (!encryptionPublicKey && api.encryptionPublicKey) encryptionPublicKey = api.encryptionPublicKey;
+
+      // Nested walletProvider
+      if (!coinPublicKey && api.walletProvider) {
+        if (typeof api.walletProvider.getCoinPublicKey === 'function') {
+          coinPublicKey = await api.walletProvider.getCoinPublicKey();
+        }
+        if (typeof api.walletProvider.getEncryptionPublicKey === 'function') {
+          encryptionPublicKey = await api.walletProvider.getEncryptionPublicKey();
         }
       }
 
-      // Resolve state / public keys across different Midnight wallet versions
-      let state: any = {};
-      if (typeof api.state === 'function') {
-        state = await api.state();
-      } else if (api.state) {
-        state = api.state;
+      // If still missing, check for any public key or address string
+      if (!coinPublicKey && typeof api.getAddresses === 'function') {
+        const addrs = await api.getAddresses();
+        if (addrs && addrs.length > 0) coinPublicKey = addrs[0];
       }
 
-      const coinPublicKey =
-        state.coinPublicKey ||
-        (typeof api.getCoinPublicKey === 'function' ? await api.getCoinPublicKey() : null) ||
-        (api.walletProvider && typeof api.walletProvider.getCoinPublicKey === 'function' ? await api.walletProvider.getCoinPublicKey() : null);
-
-      const encryptionPublicKey =
-        state.encryptionPublicKey ||
-        (typeof api.getEncryptionPublicKey === 'function' ? await api.getEncryptionPublicKey() : null) ||
-        (api.walletProvider && typeof api.walletProvider.getEncryptionPublicKey === 'function' ? await api.walletProvider.getEncryptionPublicKey() : null);
-
-      if (!coinPublicKey || !encryptionPublicKey) {
-        throw new Error('Please ensure your 1AM wallet is unlocked, has a created account, and is connected.');
+      if (!coinPublicKey) {
+        console.error('Wallet API inspection:', api);
+        throw new Error('1AM wallet keys unavailable. Open 1AM extension, unlock your account, and ensure Preprod network is active.');
       }
 
-      // Construct compliant wallet provider bridge
+      // Fallback encryption key if unexposed by connector
+      if (!encryptionPublicKey) {
+        encryptionPublicKey = coinPublicKey;
+      }
+
       const walletProvider = {
         coinPublicKey,
         encryptionPublicKey,
@@ -116,7 +127,7 @@ export default function DeployPage() {
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('Submitting Zero-Knowledge transaction to 1AM wallet...');
+      setStatus('Submitting Zero-Knowledge transaction to 1AM wallet for signing...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
