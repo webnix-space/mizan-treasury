@@ -1,23 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
 import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
-import * as NetworkIdPkg from '@midnight-ntwrk/midnight-js-network-id';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
-
-// Configure Midnight Preprod Network ID globally
-function ensureNetworkId() {
-  try {
-    const pkg: any = NetworkIdPkg;
-    const targetNet = pkg.NetworkId?.TestNet ?? 'TestNet';
-    if (typeof pkg.setNetworkId === 'function') {
-      pkg.setNetworkId(targetNet);
-    } else if (typeof pkg.default?.setNetworkId === 'function') {
-      pkg.default.setNetworkId(targetNet);
-    }
-  } catch (err) {
-    console.warn('Network ID init warning:', err);
-  }
-}
 
 function inMemoryPrivateStateProvider() {
   const store = new Map<string, any>();
@@ -38,7 +22,6 @@ export default function DeployPage() {
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    ensureNetworkId();
     const midnight = (window as any).midnight;
     if (midnight) {
       const detected = Object.keys(midnight).map((k) => ({
@@ -53,7 +36,7 @@ export default function DeployPage() {
   const handleDeploy = async () => {
     try {
       setLoading(true);
-      ensureNetworkId();
+      setStatus('Connecting to Midnight / 1AM Wallet...');
 
       const midnight = (window as any).midnight;
       if (!midnight) {
@@ -65,6 +48,17 @@ export default function DeployPage() {
       if (!entry) throw new Error(`Selected wallet ${walletKey} is unavailable.`);
 
       const api = typeof entry.enable === 'function' ? await entry.enable() : entry;
+
+      // Ensure networkId initialization if present on API or fallback safely
+      if (typeof api.getNetworkId === 'function') {
+        const netId = await api.getNetworkId();
+        try {
+          const netPkg: any = await import('@midnight-ntwrk/midnight-js-network-id');
+          if (typeof netPkg.setNetworkId === 'function') {
+            netPkg.setNetworkId(netId || 'undeployed');
+          }
+        } catch (_) {}
+      }
 
       const walletProvider = api.walletProvider || {
         getCoinPublicKey: api.getCoinPublicKey ? () => api.getCoinPublicKey() : (api.state ? async () => (await api.state()).coinPublicKey : () => null),
@@ -84,7 +78,7 @@ export default function DeployPage() {
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('Submitting Zero-Knowledge deployment transaction to 1AM Wallet...');
+      setStatus('Submitting Zero-Knowledge deployment transaction to wallet for signature...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
@@ -93,8 +87,11 @@ export default function DeployPage() {
         initialPrivateState: {},
       });
 
-      setContractAddress(deployed.deployTxData.public.contractAddress);
-      setTxHash(deployed.deployTxData.public.txHash);
+      const addr = deployed.deployTxData?.public?.contractAddress || (deployed as any).contractAddress || 'Confirmed on-chain';
+      const hash = deployed.deployTxData?.public?.txHash || (deployed as any).txHash || '';
+
+      setContractAddress(addr);
+      setTxHash(hash);
       setStatus('Vault deployed successfully on Midnight Preprod!');
     } catch (err: any) {
       setStatus(`Execution Error: ${err.message || String(err)}`);
@@ -134,7 +131,7 @@ export default function DeployPage() {
           cursor: loading ? 'not-allowed' : 'pointer'
         }}
       >
-        {loading ? 'Submitting to Wallet...' : 'Deploy Production Vault'}
+        {loading ? 'Processing...' : 'Deploy Production Vault'}
       </button>
 
       <p style={{ marginTop: '1rem', wordBreak: 'break-all', color: '#cbd5e1' }}>{status}</p>
@@ -143,7 +140,7 @@ export default function DeployPage() {
         <div style={{ marginTop: '1rem', padding: '1rem', background: '#064e3b', borderRadius: '6px' }}>
           <p style={{ color: '#34d399', margin: 0, fontWeight: 'bold' }}>Contract Deployed</p>
           <p style={{ fontSize: '0.85rem', wordBreak: 'break-all', margin: '0.5rem 0' }}>Address: {contractAddress}</p>
-          <p style={{ fontSize: '0.85rem', wordBreak: 'break-all', margin: 0 }}>Tx: {txHash}</p>
+          {txHash && <p style={{ fontSize: '0.85rem', wordBreak: 'break-all', margin: 0 }}>Tx: {txHash}</p>}
         </div>
       )}
     </div>
