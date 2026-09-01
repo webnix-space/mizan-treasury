@@ -1,0 +1,30 @@
+pragma language_version >= 0.16;
+
+import CompactStandardLibrary;
+
+enum State {
+    UNINITIALIZED,
+    INITIALIZED
+}
+
+export ledger state: State;
+export ledger vault_owner: Bytes<32>;
+export ledger total_supply: Uint<64>;
+
+constructor(owner: Bytes<32>, initial_balance: Uint<64>) {
+    vault_owner = disclose(owner);
+    total_supply = disclose(initial_balance);
+    state = State.INITIALIZED;
+}
+
+export circuit deposit(amount: Uint<64>): [] {
+    assert(amount > 0, "Deposit amount must be positive");
+    total_supply = disclose((total_supply + amount) as Uint<64>);
+}
+
+export circuit withdraw(amount: Uint<64>, caller_key: Bytes<32>): [] {
+    assert(caller_key == vault_owner, "Unauthorized withdrawal");
+    assert(total_supply >= amount, "Insufficient funds");
+    
+    total_supply = disclose((total_supply - amount) as Uint<64>);
+}
