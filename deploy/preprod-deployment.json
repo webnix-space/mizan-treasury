@@ -1,0 +1,9 @@
+{
+  "network": "midnight-preprod",
+  "contractName": "TreasuryVault",
+  "indexer": "https://indexer.preprod.midnight.network/api/v1/graphql",
+  "proofServer": "http://127.0.0.1:6300",
+  "initialReserves": "1000000",
+  "deployedAt": "2026-09-01T12:58:11.833Z",
+  "status": "ACTIVE_PREPROD"
+}
