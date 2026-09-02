@@ -56,11 +56,11 @@ function deriveKeysFromShieldedAddress(shieldedAddr: string) {
   return { cpk, epk };
 }
 
-// Direct submission to Midnight Preprod GraphQL node
-async function submitDirectToPreprod(tx: any): Promise<string> {
+// Open Midnight Preprod Submitter
+async function submitToMidnightNode(tx: any): Promise<string> {
   const hex = typeof tx === 'string' ? tx : (tx.serialize ? tx.serialize() : (tx.bytes ? Buffer.from(tx.bytes).toString('hex') : null));
   if (!hex) {
-    throw new Error('Unable to serialize transaction for direct node submission.');
+    throw new Error('Unable to serialize transaction payload for network submission.');
   }
 
   const query = `
@@ -71,7 +71,7 @@ async function submitDirectToPreprod(tx: any): Promise<string> {
     }
   `;
 
-  const response = await fetch('https://api-preprod.1am.xyz/api/v4/graphql', {
+  const response = await fetch('https://indexer.preprod.midnight.network/api/v1/graphql', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -85,7 +85,7 @@ async function submitDirectToPreprod(tx: any): Promise<string> {
     throw new Error(json.errors[0].message);
   }
 
-  return json.data?.submitTransaction?.id || 'Submitted via 1AM Preprod Gateway';
+  return json.data?.submitTransaction?.id || 'Transaction submitted to Midnight Preprod';
 }
 
 export default function DeployPage() {
@@ -143,8 +143,9 @@ export default function DeployPage() {
 
       setDiag(`CPK: ${coinPk.slice(0, 24)}...`);
 
-      const INDEXER_HTTP = 'https://api-preprod.1am.xyz/api/v4/graphql';
-      const INDEXER_WS = 'wss://api-preprod.1am.xyz/api/v4/graphql/ws';
+      // Public open Preprod indexer endpoints (no 401 restrictions)
+      const INDEXER_HTTP = 'https://indexer.preprod.midnight.network/api/v1/graphql';
+      const INDEXER_WS = 'wss://indexer.preprod.midnight.network/api/v1/graphql/ws';
       const PROOF_SERVER = 'https://api-preprod.1am.xyz';
 
       const nativeWs = typeof window !== 'undefined' ? (window.WebSocket as any) : undefined;
@@ -172,20 +173,18 @@ export default function DeployPage() {
       const midnightProvider = {
         submitTx: async (tx: any) => {
           setActiveStep('Submitting transaction...');
-          setStatus('Step 3b: Submitting to Midnight Preprod...');
-          
-          // First attempt wallet submit
+          setStatus('Step 3b: Submitting to Midnight Preprod node...');
+
           try {
             if (typeof api.submitTransaction === 'function') {
               const res = await api.submitTransaction(tx);
               if (res) return res;
             }
           } catch (walletErr: any) {
-            console.warn('Wallet submit returned disconnected. Falling back to direct Preprod gateway submit:', walletErr.message);
+            console.warn('Wallet submit bypass, falling back to open indexer:', walletErr.message);
           }
 
-          // Fallback: Direct submit to Preprod GraphQL Gateway
-          return await submitDirectToPreprod(tx);
+          return await submitToMidnightNode(tx);
         },
       };
 
@@ -204,7 +203,7 @@ export default function DeployPage() {
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
       setActiveStep('deployContract executing...');
-      setStatus('Step 3: Generating circuit proof & submitting to chain...');
+      setStatus('Step 3: Generating circuit proof & broadcasting transaction...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
