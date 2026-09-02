@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
 import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
+import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
+import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
 
 try {
@@ -22,18 +24,16 @@ function inMemoryPrivateStateProvider() {
   };
 }
 
-// Safely pull string out of objects like { dustAddress: '...' }, { address: '...' }, or arrays
 function extractString(val: any): string | null {
   if (!val) return null;
   if (typeof val === 'string' && val.trim().length > 0) return val.trim();
   if (Array.isArray(val) && val.length > 0) return extractString(val[0]);
   if (typeof val === 'object') {
+    if (typeof val.unshieldedAddress === 'string') return val.unshieldedAddress;
     if (typeof val.dustAddress === 'string') return val.dustAddress;
-    if (typeof val.address === 'string') return val.address;
     if (typeof val.shieldedAddress === 'string') return val.shieldedAddress;
+    if (typeof val.address === 'string') return val.address;
     if (typeof val.bech32 === 'string') return val.bech32;
-    if (typeof val.data === 'string') return val.data;
-    if (typeof val.value === 'string') return val.value;
   }
   return null;
 }
@@ -66,7 +66,7 @@ export default function DeployPage() {
 
       const midnight = (window as any).midnight;
       if (!midnight) {
-        throw new Error('1AM wallet extension not found in window.midnight.');
+        throw new Error('1AM wallet extension not detected.');
       }
 
       const walletKey = selectedWallet || Object.keys(midnight)[0];
@@ -75,42 +75,44 @@ export default function DeployPage() {
 
       const api = typeof entry.connect === 'function' ? await entry.connect() : (typeof entry.enable === 'function' ? await entry.enable() : entry);
 
-      setStatus('2/4: Reading wallet keys & proof provider...');
+      setStatus('2/4: Retrieving addresses and network configuration...');
 
+      const unshieldedRaw = typeof api.getUnshieldedAddress === 'function' ? await api.getUnshieldedAddress() : null;
+      const dustRaw = typeof api.getDustAddress === 'function' ? await api.getDustAddress() : null;
       let shielded = null;
       if (typeof api.getShieldedAddresses === 'function') {
         shielded = await api.getShieldedAddresses();
       }
 
-      const unshieldedRaw = typeof api.getUnshieldedAddress === 'function' ? await api.getUnshieldedAddress() : null;
-      const dustRaw = typeof api.getDustAddress === 'function' ? await api.getDustAddress() : null;
+      const unshieldedKey = extractString(unshieldedRaw) || extractString(dustRaw);
+      const shieldedKey = extractString(shielded);
+      const activeKey = unshieldedKey || shieldedKey;
 
-      const resolvedKey =
-        extractString(shielded) ||
-        extractString(dustRaw) ||
-        extractString(unshieldedRaw);
-
-      if (!resolvedKey) {
-        throw new Error('Could not find active address in 1AM. Ensure your Preprod account is unlocked.');
+      if (!activeKey) {
+        throw new Error('No address found in 1AM wallet.');
       }
 
-      setAccountAddr(resolvedKey);
+      setAccountAddr(`Unshielded: ${unshieldedKey || 'None'} | Shielded: ${shieldedKey || 'None'}`);
 
-      let proofProvider = null;
-      if (typeof api.getProvingProvider === 'function') {
-        proofProvider = await api.getProvingProvider();
-      } else if (api.proofProvider) {
-        proofProvider = api.proofProvider;
-      }
+      // Official 1AM Preprod Endpoints
+      const INDEXER_HTTP = 'https://api-preprod.1am.xyz/api/v4/graphql';
+      const INDEXER_WS = 'wss://api-preprod.1am.xyz/api/v4/graphql/ws';
+      const PROOF_SERVER = 'https://api-preprod.1am.xyz';
+
+      // Pass window.WebSocket explicitly to avoid isomorphic-ws bundling issues
+      const nativeWs = typeof window !== 'undefined' ? (window.WebSocket as any) : undefined;
+      const publicDataProvider = api.publicDataProvider || indexerPublicDataProvider(INDEXER_HTTP, INDEXER_WS, nativeWs);
+      const proofProvider = api.proofProvider || httpClientProofProvider(PROOF_SERVER);
 
       const walletProvider = {
-        coinPublicKey: resolvedKey,
-        encryptionPublicKey: resolvedKey,
-        getCoinPublicKey: async () => resolvedKey,
-        getEncryptionPublicKey: async () => resolvedKey,
+        coinPublicKey: activeKey,
+        encryptionPublicKey: shieldedKey || activeKey,
+        getCoinPublicKey: async () => activeKey,
+        getEncryptionPublicKey: async () => shieldedKey || activeKey,
         balanceTx: async (tx: any, ttl?: any) => {
           if (typeof api.balanceUnsealedTransaction === 'function') return api.balanceUnsealedTransaction(tx);
           if (typeof api.balanceSealedTransaction === 'function') return api.balanceSealedTransaction(tx);
+          if (typeof api.balanceTx === 'function') return api.balanceTx(tx, ttl);
           return tx;
         },
       };
@@ -124,8 +126,8 @@ export default function DeployPage() {
 
       const providers = {
         privateStateProvider: inMemoryPrivateStateProvider(),
-        publicDataProvider: api.publicDataProvider,
-        zkConfigProvider: api.zkConfigProvider || {
+        publicDataProvider,
+        zkConfigProvider: {
           getZkConfig: async () => ({ proverKey: async () => new Uint8Array(), verifierKey: async () => new Uint8Array() }),
         },
         proofProvider,
@@ -136,7 +138,7 @@ export default function DeployPage() {
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('3/4: Generating ZK proof & submitting transaction...');
+      setStatus('3/4: Generating witness proof and requesting 1AM confirmation...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
@@ -150,7 +152,7 @@ export default function DeployPage() {
 
       setContractAddress(extractString(addr) || String(addr));
       setTxHash(extractString(hash) || String(hash));
-      setStatus('4/4: Treasury Vault deployed successfully on Midnight Preprod!');
+      setStatus('4/4: Treasury Vault successfully deployed on Midnight Preprod!');
     } catch (err: any) {
       setStatus(`Execution Error: ${err.message || String(err)}`);
     } finally {
@@ -196,7 +198,7 @@ export default function DeployPage() {
       <p style={{ marginTop: '1.2rem', wordBreak: 'break-all', color: '#94a3b8', fontSize: '0.95rem' }}>{status}</p>
 
       {accountAddr && (
-        <p style={{ fontSize: '0.8rem', color: '#64748b', wordBreak: 'break-all' }}>Connected: {accountAddr}</p>
+        <p style={{ fontSize: '0.8rem', color: '#64748b', wordBreak: 'break-all' }}>{accountAddr}</p>
       )}
 
       {contractAddress && (
