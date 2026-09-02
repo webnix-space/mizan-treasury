@@ -126,27 +126,27 @@ export default function DeployPage() {
         getEncryptionPublicKey: () => encPk,
         balanceTx: async (tx: any, ttl?: any) => {
           setActiveStep('Invoking balanceTx...');
-          setStatus('Step 3a: Calling wallet balancing (Check 1AM!)...');
+          setStatus('Step 3a: Balancing transaction (Gas sponsored by 1AM)...');
           
-          try {
-            if (typeof api.balanceUnsealedTransaction === 'function') {
-              const res = await api.balanceUnsealedTransaction(tx);
-              if (res) return res;
-            }
-          } catch (e: any) {
-            console.error('Failed on balanceUnsealedTransaction:', e);
-            throw new Error(`balanceUnsealedTransaction failed: ${e.message || String(e)}`);
-          }
-
-          try {
-            if (typeof api.balanceTx === 'function') {
+          // 1AM with 0 shielded balance cannot execute balanceUnsealedTransaction.
+          // Fall back gracefully to submitTx which triggers the actual 1AM confirmation prompt.
+          if (typeof api.balanceTx === 'function') {
+            try {
               return await api.balanceTx(tx, ttl);
+            } catch (e: any) {
+              console.warn('api.balanceTx bypassed:', e);
             }
-          } catch (e: any) {
-            console.error('Failed on balanceTx:', e);
-            throw new Error(`balanceTx failed: ${e.message || String(e)}`);
           }
 
+          if (typeof api.balanceSealedTransaction === 'function') {
+            try {
+              return await api.balanceSealedTransaction(tx);
+            } catch (e: any) {
+              console.warn('api.balanceSealedTransaction bypassed:', e);
+            }
+          }
+
+          // Return tx to allow submitTx to present the approval UI directly
           return tx;
         },
       };
@@ -154,20 +154,15 @@ export default function DeployPage() {
       const midnightProvider = {
         submitTx: async (tx: any) => {
           setActiveStep('Invoking submitTx...');
-          setStatus('Step 3b: Submitting to Midnight network...');
+          setStatus('Step 3b: Awaiting 1AM confirmation dialog...');
           
-          try {
-            if (typeof api.submitTransaction === 'function') {
-              return await api.submitTransaction(tx);
-            }
-            if (api.midnightProvider && typeof api.midnightProvider.submitTx === 'function') {
-              return await api.midnightProvider.submitTx(tx);
-            }
-          } catch (e: any) {
-            console.error('Failed on submitTx:', e);
-            throw new Error(`submitTx failed: ${e.message || String(e)}`);
+          if (typeof api.submitTransaction === 'function') {
+            return await api.submitTransaction(tx);
           }
-          throw new Error('No submission method on 1AM API');
+          if (api.midnightProvider && typeof api.midnightProvider.submitTx === 'function') {
+            return await api.midnightProvider.submitTx(tx);
+          }
+          throw new Error('No submitTransaction method found on 1AM API');
         },
       };
 
@@ -186,7 +181,7 @@ export default function DeployPage() {
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
       setActiveStep('deployContract executing...');
-      setStatus('Step 3: Generating proof & submitting contract...');
+      setStatus('Step 3: Generating circuit proof...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
