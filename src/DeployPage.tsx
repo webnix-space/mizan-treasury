@@ -5,8 +5,12 @@ import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
 
 try {
-  setNetworkId('undeployed');
-} catch (_) {}
+  setNetworkId('testnet');
+} catch (_) {
+  try {
+    setNetworkId('undeployed');
+  } catch (_) {}
+}
 
 function inMemoryPrivateStateProvider() {
   const store = new Map<string, any>();
@@ -18,19 +22,6 @@ function inMemoryPrivateStateProvider() {
   };
 }
 
-function extractStringKey(val: any): string | null {
-  if (!val) return null;
-  if (typeof val === 'string' && val.trim().length > 0) return val.trim();
-  if (typeof val === 'object') {
-    if (typeof val.bech32 === 'string') return val.bech32;
-    if (typeof val.address === 'string') return val.address;
-    if (typeof val.data === 'string') return val.data;
-    if (typeof val.value === 'string') return val.value;
-    if (typeof val.key === 'string') return val.key;
-  }
-  return null;
-}
-
 export default function DeployPage() {
   const [status, setStatus] = useState<string>('Ready to deploy');
   const [wallets, setWallets] = useState<{ id: string; name: string }[]>([]);
@@ -38,7 +29,7 @@ export default function DeployPage() {
   const [contractAddress, setContractAddress] = useState<string>('');
   const [txHash, setTxHash] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
-  const [diagInfo, setDiagInfo] = useState<string>('');
+  const [accountAddr, setAccountAddr] = useState<string>('');
 
   useEffect(() => {
     const midnight = (window as any).midnight;
@@ -55,121 +46,90 @@ export default function DeployPage() {
   const handleDeploy = async () => {
     try {
       setLoading(true);
-      setDiagInfo('');
       setStatus('1/4: Requesting 1AM authorization prompt...');
 
       const midnight = (window as any).midnight;
       if (!midnight) {
-        throw new Error('Midnight compatible wallet extension not detected.');
+        throw new Error('1AM wallet extension not detected in window.midnight.');
       }
 
       const walletKey = selectedWallet || Object.keys(midnight)[0];
       const entry = midnight[walletKey];
       if (!entry) throw new Error(`Wallet ${walletKey} not available.`);
 
-      // 1AM DApp Connector v4 entrypoint is .connect()
-      let api: any;
-      if (typeof entry.connect === 'function') {
-        api = await entry.connect();
-      } else if (typeof entry.enable === 'function') {
-        api = await entry.enable();
-      } else {
-        api = entry;
+      // 1. Connect to 1AM API
+      const api = typeof entry.connect === 'function' ? await entry.connect() : (typeof entry.enable === 'function' ? await entry.enable() : entry);
+
+      setStatus('2/4: Fetching 1AM account addresses and proving provider...');
+
+      // 2. Fetch addresses using verified 1AM Connector v4 methods
+      let shieldedAddresses: string[] = [];
+      if (typeof api.getShieldedAddresses === 'function') {
+        shieldedAddresses = await api.getShieldedAddresses();
       }
 
-      setStatus('2/4: Reading authenticated wallet state...');
+      const unshieldedAddr = typeof api.getUnshieldedAddress === 'function' ? await api.getUnshieldedAddress() : null;
+      const dustAddr = typeof api.getDustAddress === 'function' ? await api.getDustAddress() : null;
 
-      // Extract state from connected API instance
-      let state: any = {};
-      if (typeof api.state === 'function') {
-        state = await api.state();
-      } else if (api.state && typeof api.state.subscribe === 'function') {
-        state = await new Promise((resolve) => {
-          const sub = api.state.subscribe({
-            next: (s: any) => {
-              if (s) {
-                if (sub?.unsubscribe) sub.unsubscribe();
-                resolve(s);
-              }
-            },
-            error: () => resolve({}),
-          });
-          setTimeout(() => resolve({}), 3000);
-        });
-      } else if (api.state) {
-        state = api.state;
+      const activeCoinPk = (shieldedAddresses && shieldedAddresses.length > 0)
+        ? shieldedAddresses[0]
+        : (dustAddr || unshieldedAddr);
+
+      if (!activeCoinPk) {
+        throw new Error('No active account address found in 1AM wallet. Ensure your wallet has an account selected on Preprod.');
       }
 
-      if (typeof api.getNetworkId === 'function') {
-        const net = await api.getNetworkId();
-        if (net) {
-          try {
-            setNetworkId(net);
-          } catch (_) {}
-        }
+      setAccountAddr(activeCoinPk);
+
+      // 3. Resolve proof provider from 1AM
+      let proofProvider = null;
+      if (typeof api.getProvingProvider === 'function') {
+        proofProvider = await api.getProvingProvider();
+      } else if (api.proofProvider) {
+        proofProvider = api.proofProvider;
       }
 
-      let coinPk =
-        extractStringKey(state?.coinPublicKey) ||
-        extractStringKey(state?.address) ||
-        extractStringKey(state?.bech32Address) ||
-        extractStringKey(typeof api.getCoinPublicKey === 'function' ? await api.getCoinPublicKey() : null) ||
-        extractStringKey(api.coinPublicKey) ||
-        (api.walletProvider && extractStringKey(typeof api.walletProvider.getCoinPublicKey === 'function' ? await api.walletProvider.getCoinPublicKey() : null));
-
-      let encPk =
-        extractStringKey(state?.encryptionPublicKey) ||
-        extractStringKey(state?.encPublicKey) ||
-        extractStringKey(typeof api.getEncryptionPublicKey === 'function' ? await api.getEncryptionPublicKey() : null) ||
-        extractStringKey(api.encryptionPublicKey) ||
-        (api.walletProvider && extractStringKey(typeof api.walletProvider.getEncryptionPublicKey === 'function' ? await api.walletProvider.getEncryptionPublicKey() : null));
-
-      if (!coinPk && typeof api.getAddresses === 'function') {
-        const addrs = await api.getAddresses();
-        if (addrs && addrs.length > 0) coinPk = extractStringKey(addrs[0]);
-      }
-
-      if (!coinPk) {
-        setDiagInfo(JSON.stringify({ connectedKeys: Object.keys(api || {}), state: Object.keys(state || {}) }));
-        throw new Error('1AM wallet connected, but account address is not exposed. Ensure an account exists and is selected.');
-      }
-
-      if (!encPk) encPk = coinPk;
-
-      setDiagInfo(`Connected Account: ${coinPk.slice(0, 16)}...`);
-      setStatus('3/4: Generating ZK proof parameters...');
-
-      const walletProvider = api.walletProvider || {
-        coinPublicKey: coinPk,
-        encryptionPublicKey: encPk,
-        getCoinPublicKey: async () => coinPk,
-        getEncryptionPublicKey: async () => encPk,
+      // 4. Construct midnight-js compliant wallet provider
+      const walletProvider = {
+        coinPublicKey: activeCoinPk,
+        encryptionPublicKey: activeCoinPk,
+        getCoinPublicKey: async () => activeCoinPk,
+        getEncryptionPublicKey: async () => activeCoinPk,
         balanceTx: async (tx: any, ttl?: any) => {
-          if (typeof api.balanceTx === 'function') return api.balanceTx(tx, ttl);
-          if (typeof api.balanceTransaction === 'function') return api.balanceTransaction(tx, ttl);
+          if (typeof api.balanceUnsealedTransaction === 'function') {
+            return api.balanceUnsealedTransaction(tx);
+          }
+          if (typeof api.balanceSealedTransaction === 'function') {
+            return api.balanceSealedTransaction(tx);
+          }
           return tx;
         },
       };
 
-      const providers = api.providers || {
+      const midnightProvider = {
+        submitTx: async (tx: any) => {
+          if (typeof api.submitTransaction === 'function') {
+            return api.submitTransaction(tx);
+          }
+          return (api.midnightProvider || api).submitTx(tx);
+        },
+      };
+
+      const providers = {
         privateStateProvider: inMemoryPrivateStateProvider(),
         publicDataProvider: api.publicDataProvider,
         zkConfigProvider: api.zkConfigProvider || {
           getZkConfig: async () => ({ proverKey: async () => new Uint8Array(), verifierKey: async () => new Uint8Array() }),
         },
-        proofProvider: api.proofProvider,
+        proofProvider,
         walletProvider,
-        midnightProvider: api.midnightProvider || api,
+        midnightProvider,
       };
-
-      if (!providers.privateStateProvider) {
-        providers.privateStateProvider = inMemoryPrivateStateProvider();
-      }
 
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('4/4: Submitting contract deployment to 1AM for signature...');
+      setStatus('3/4: Generating witness proof and submitting to 1AM for signature...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
@@ -178,12 +138,12 @@ export default function DeployPage() {
         initialPrivateState: {},
       });
 
-      const addr = deployed.deployTxData?.public?.contractAddress || (deployed as any).contractAddress || 'Confirmed on-chain';
+      const addr = deployed.deployTxData?.public?.contractAddress || (deployed as any).contractAddress || 'Confirmed on Midnight Preprod';
       const hash = deployed.deployTxData?.public?.txHash || (deployed as any).txHash || '';
 
       setContractAddress(addr);
       setTxHash(hash);
-      setStatus('Treasury Vault deployed successfully on Midnight Preprod!');
+      setStatus('4/4: Treasury Vault successfully deployed on Midnight Preprod!');
     } catch (err: any) {
       setStatus(`Execution Error: ${err.message || String(err)}`);
     } finally {
@@ -228,8 +188,8 @@ export default function DeployPage() {
 
       <p style={{ marginTop: '1.2rem', wordBreak: 'break-all', color: '#94a3b8', fontSize: '0.95rem' }}>{status}</p>
 
-      {diagInfo && (
-        <p style={{ fontSize: '0.8rem', color: '#64748b', wordBreak: 'break-all' }}>{diagInfo}</p>
+      {accountAddr && (
+        <p style={{ fontSize: '0.8rem', color: '#64748b', wordBreak: 'break-all' }}>Connected: {accountAddr}</p>
       )}
 
       {contractAddress && (
