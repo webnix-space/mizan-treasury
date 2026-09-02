@@ -22,6 +22,22 @@ function inMemoryPrivateStateProvider() {
   };
 }
 
+// Safely pull string out of objects like { dustAddress: '...' }, { address: '...' }, or arrays
+function extractString(val: any): string | null {
+  if (!val) return null;
+  if (typeof val === 'string' && val.trim().length > 0) return val.trim();
+  if (Array.isArray(val) && val.length > 0) return extractString(val[0]);
+  if (typeof val === 'object') {
+    if (typeof val.dustAddress === 'string') return val.dustAddress;
+    if (typeof val.address === 'string') return val.address;
+    if (typeof val.shieldedAddress === 'string') return val.shieldedAddress;
+    if (typeof val.bech32 === 'string') return val.bech32;
+    if (typeof val.data === 'string') return val.data;
+    if (typeof val.value === 'string') return val.value;
+  }
+  return null;
+}
+
 export default function DeployPage() {
   const [status, setStatus] = useState<string>('Ready to deploy');
   const [wallets, setWallets] = useState<{ id: string; name: string }[]>([]);
@@ -46,42 +62,40 @@ export default function DeployPage() {
   const handleDeploy = async () => {
     try {
       setLoading(true);
-      setStatus('1/4: Requesting 1AM authorization prompt...');
+      setStatus('1/4: Connecting to 1AM Wallet...');
 
       const midnight = (window as any).midnight;
       if (!midnight) {
-        throw new Error('1AM wallet extension not detected in window.midnight.');
+        throw new Error('1AM wallet extension not found in window.midnight.');
       }
 
       const walletKey = selectedWallet || Object.keys(midnight)[0];
       const entry = midnight[walletKey];
       if (!entry) throw new Error(`Wallet ${walletKey} not available.`);
 
-      // 1. Connect to 1AM API
       const api = typeof entry.connect === 'function' ? await entry.connect() : (typeof entry.enable === 'function' ? await entry.enable() : entry);
 
-      setStatus('2/4: Fetching 1AM account addresses and proving provider...');
+      setStatus('2/4: Reading wallet keys & proof provider...');
 
-      // 2. Fetch addresses using verified 1AM Connector v4 methods
-      let shieldedAddresses: string[] = [];
+      let shielded = null;
       if (typeof api.getShieldedAddresses === 'function') {
-        shieldedAddresses = await api.getShieldedAddresses();
+        shielded = await api.getShieldedAddresses();
       }
 
-      const unshieldedAddr = typeof api.getUnshieldedAddress === 'function' ? await api.getUnshieldedAddress() : null;
-      const dustAddr = typeof api.getDustAddress === 'function' ? await api.getDustAddress() : null;
+      const unshieldedRaw = typeof api.getUnshieldedAddress === 'function' ? await api.getUnshieldedAddress() : null;
+      const dustRaw = typeof api.getDustAddress === 'function' ? await api.getDustAddress() : null;
 
-      const activeCoinPk = (shieldedAddresses && shieldedAddresses.length > 0)
-        ? shieldedAddresses[0]
-        : (dustAddr || unshieldedAddr);
+      const resolvedKey =
+        extractString(shielded) ||
+        extractString(dustRaw) ||
+        extractString(unshieldedRaw);
 
-      if (!activeCoinPk) {
-        throw new Error('No active account address found in 1AM wallet. Ensure your wallet has an account selected on Preprod.');
+      if (!resolvedKey) {
+        throw new Error('Could not find active address in 1AM. Ensure your Preprod account is unlocked.');
       }
 
-      setAccountAddr(activeCoinPk);
+      setAccountAddr(resolvedKey);
 
-      // 3. Resolve proof provider from 1AM
       let proofProvider = null;
       if (typeof api.getProvingProvider === 'function') {
         proofProvider = await api.getProvingProvider();
@@ -89,28 +103,21 @@ export default function DeployPage() {
         proofProvider = api.proofProvider;
       }
 
-      // 4. Construct midnight-js compliant wallet provider
       const walletProvider = {
-        coinPublicKey: activeCoinPk,
-        encryptionPublicKey: activeCoinPk,
-        getCoinPublicKey: async () => activeCoinPk,
-        getEncryptionPublicKey: async () => activeCoinPk,
+        coinPublicKey: resolvedKey,
+        encryptionPublicKey: resolvedKey,
+        getCoinPublicKey: async () => resolvedKey,
+        getEncryptionPublicKey: async () => resolvedKey,
         balanceTx: async (tx: any, ttl?: any) => {
-          if (typeof api.balanceUnsealedTransaction === 'function') {
-            return api.balanceUnsealedTransaction(tx);
-          }
-          if (typeof api.balanceSealedTransaction === 'function') {
-            return api.balanceSealedTransaction(tx);
-          }
+          if (typeof api.balanceUnsealedTransaction === 'function') return api.balanceUnsealedTransaction(tx);
+          if (typeof api.balanceSealedTransaction === 'function') return api.balanceSealedTransaction(tx);
           return tx;
         },
       };
 
       const midnightProvider = {
         submitTx: async (tx: any) => {
-          if (typeof api.submitTransaction === 'function') {
-            return api.submitTransaction(tx);
-          }
+          if (typeof api.submitTransaction === 'function') return api.submitTransaction(tx);
           return (api.midnightProvider || api).submitTx(tx);
         },
       };
@@ -129,7 +136,7 @@ export default function DeployPage() {
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('3/4: Generating witness proof and submitting to 1AM for signature...');
+      setStatus('3/4: Generating ZK proof & submitting transaction...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
@@ -138,12 +145,12 @@ export default function DeployPage() {
         initialPrivateState: {},
       });
 
-      const addr = deployed.deployTxData?.public?.contractAddress || (deployed as any).contractAddress || 'Confirmed on Midnight Preprod';
+      const addr = deployed.deployTxData?.public?.contractAddress || (deployed as any).contractAddress || 'Confirmed on-chain';
       const hash = deployed.deployTxData?.public?.txHash || (deployed as any).txHash || '';
 
-      setContractAddress(addr);
-      setTxHash(hash);
-      setStatus('4/4: Treasury Vault successfully deployed on Midnight Preprod!');
+      setContractAddress(extractString(addr) || String(addr));
+      setTxHash(extractString(hash) || String(hash));
+      setStatus('4/4: Treasury Vault deployed successfully on Midnight Preprod!');
     } catch (err: any) {
       setStatus(`Execution Error: ${err.message || String(err)}`);
     } finally {
