@@ -91,15 +91,9 @@ export default function DeployPage() {
       const entry = midnight[walletKey];
       if (!entry) throw new Error(`Wallet ${walletKey} not available.`);
 
-      // Establish connection
-      let api = typeof entry.connect === 'function' ? await entry.connect() : (typeof entry.enable === 'function' ? await entry.enable() : entry);
+      const api = typeof entry.connect === 'function' ? await entry.connect() : (typeof entry.enable === 'function' ? await entry.enable() : entry);
 
-      // Keepalive ping to ensure mobile service worker does not terminate
-      if (typeof api.getConnectionStatus === 'function') {
-        await api.getConnectionStatus().catch(() => {});
-      }
-
-      setStatus('2/4: Extracting shielded keys & preparing indexer provider...');
+      setStatus('2/4: Resolving keys & proof servers...');
 
       const shieldedRaw = typeof api.getShieldedAddresses === 'function' ? await api.getShieldedAddresses() : null;
       const shieldedAddr = extractString(shieldedRaw);
@@ -120,45 +114,66 @@ export default function DeployPage() {
 
       const nativeWs = typeof window !== 'undefined' ? (window.WebSocket as any) : undefined;
       const publicDataProvider = api.publicDataProvider || indexerPublicDataProvider(INDEXER_HTTP, INDEXER_WS, nativeWs);
-      const proofProvider = api.proofProvider || httpClientProofProvider(PROOF_SERVER);
+      
+      let proofProvider = null;
+      if (typeof api.getProvingProvider === 'function') {
+        try {
+          proofProvider = await api.getProvingProvider();
+        } catch (_) {}
+      }
+      if (!proofProvider) {
+        proofProvider = api.proofProvider || httpClientProofProvider(PROOF_SERVER);
+      }
 
+      // 1AM v4 balancing adapter: tries all 1AM balance signatures
       const walletProvider = {
         coinPublicKey: coinPk,
         encryptionPublicKey: encPk,
         getCoinPublicKey: () => coinPk,
         getEncryptionPublicKey: () => encPk,
         balanceTx: async (tx: any, ttl?: any) => {
-          setStatus('Waiting for 1AM wallet transaction confirmation...');
-          try {
-            if (typeof api.balanceUnsealedTransaction === 'function') {
+          setStatus('Triggering 1AM confirmation dialog...');
+          
+          // Strategy 1: balanceUnsealedTransaction with raw or serialized transaction
+          if (typeof api.balanceUnsealedTransaction === 'function') {
+            try {
               return await api.balanceUnsealedTransaction(tx);
+            } catch (err: any) {
+              // If object serialization was rejected, try passing hex string if tx has serialize method
+              if (tx && typeof tx.serialize === 'function') {
+                return await api.balanceUnsealedTransaction(tx.serialize());
+              }
+              if (tx && tx.bytes) {
+                return await api.balanceUnsealedTransaction(tx.bytes);
+              }
+              throw err;
             }
-            if (typeof api.balanceSealedTransaction === 'function') {
-              return await api.balanceSealedTransaction(tx);
-            }
-            if (typeof api.balanceTx === 'function') {
-              return await api.balanceTx(tx, ttl);
-            }
-          } catch (e: any) {
-            if (e.message?.includes('disconnected') || e.message?.includes('closed')) {
-              throw new Error('1AM wallet dialog was closed or backgrounded. Switch to the 1AM tab/popup immediately to approve.');
-            }
-            throw e;
           }
+
+          // Strategy 2: balanceTx standard
+          if (typeof api.balanceTx === 'function') {
+            return await api.balanceTx(tx, ttl);
+          }
+
+          // Strategy 3: balanceSealedTransaction
+          if (typeof api.balanceSealedTransaction === 'function') {
+            return await api.balanceSealedTransaction(tx);
+          }
+
           return tx;
         },
       };
 
       const midnightProvider = {
         submitTx: async (tx: any) => {
-          setStatus('Submitting finalized transaction to Midnight Preprod...');
+          setStatus('Publishing transaction to Midnight Preprod...');
           if (typeof api.submitTransaction === 'function') {
             return await api.submitTransaction(tx);
           }
           if (api.midnightProvider && typeof api.midnightProvider.submitTx === 'function') {
             return await api.midnightProvider.submitTx(tx);
           }
-          throw new Error('No submitTransaction method found on 1AM API.');
+          throw new Error('No submit method on 1AM API');
         },
       };
 
@@ -176,7 +191,7 @@ export default function DeployPage() {
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('3/4: Generating ZK proof & requesting signature in 1AM...');
+      setStatus('3/4: Generating circuit proof & opening 1AM signing prompt...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
