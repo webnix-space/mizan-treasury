@@ -91,7 +91,13 @@ export default function DeployPage() {
       const entry = midnight[walletKey];
       if (!entry) throw new Error(`Wallet ${walletKey} not available.`);
 
-      const api = typeof entry.connect === 'function' ? await entry.connect() : (typeof entry.enable === 'function' ? await entry.enable() : entry);
+      // Establish connection
+      let api = typeof entry.connect === 'function' ? await entry.connect() : (typeof entry.enable === 'function' ? await entry.enable() : entry);
+
+      // Keepalive ping to ensure mobile service worker does not terminate
+      if (typeof api.getConnectionStatus === 'function') {
+        await api.getConnectionStatus().catch(() => {});
+      }
 
       setStatus('2/4: Extracting shielded keys & preparing indexer provider...');
 
@@ -102,16 +108,9 @@ export default function DeployPage() {
         throw new Error('Could not retrieve shielded address from 1AM. Ensure account is unlocked.');
       }
 
-      let coinPk: string;
-      let encPk: string;
-
-      try {
-        const derived = deriveKeysFromShieldedAddress(shieldedAddr);
-        coinPk = derived.cpk;
-        encPk = derived.epk;
-      } catch (e: any) {
-        throw new Error(`Failed to decode shield address: ${e.message}`);
-      }
+      const derived = deriveKeysFromShieldedAddress(shieldedAddr);
+      const coinPk = derived.cpk;
+      const encPk = derived.epk;
 
       setDiag(`Shielded CPK: ${coinPk.slice(0, 24)}...`);
 
@@ -129,18 +128,35 @@ export default function DeployPage() {
         getCoinPublicKey: () => coinPk,
         getEncryptionPublicKey: () => encPk,
         balanceTx: async (tx: any, ttl?: any) => {
-          if (typeof api.balanceUnsealedTransaction === 'function') return api.balanceUnsealedTransaction(tx);
-          if (typeof api.balanceSealedTransaction === 'function') return api.balanceSealedTransaction(tx);
-          if (typeof api.balanceTx === 'function') return api.balanceTx(tx, ttl);
+          setStatus('Waiting for 1AM wallet transaction confirmation...');
+          try {
+            if (typeof api.balanceUnsealedTransaction === 'function') {
+              return await api.balanceUnsealedTransaction(tx);
+            }
+            if (typeof api.balanceSealedTransaction === 'function') {
+              return await api.balanceSealedTransaction(tx);
+            }
+            if (typeof api.balanceTx === 'function') {
+              return await api.balanceTx(tx, ttl);
+            }
+          } catch (e: any) {
+            if (e.message?.includes('disconnected') || e.message?.includes('closed')) {
+              throw new Error('1AM wallet dialog was closed or backgrounded. Switch to the 1AM tab/popup immediately to approve.');
+            }
+            throw e;
+          }
           return tx;
         },
       };
 
       const midnightProvider = {
         submitTx: async (tx: any) => {
-          if (typeof api.submitTransaction === 'function') return api.submitTransaction(tx);
+          setStatus('Submitting finalized transaction to Midnight Preprod...');
+          if (typeof api.submitTransaction === 'function') {
+            return await api.submitTransaction(tx);
+          }
           if (api.midnightProvider && typeof api.midnightProvider.submitTx === 'function') {
-            return api.midnightProvider.submitTx(tx);
+            return await api.midnightProvider.submitTx(tx);
           }
           throw new Error('No submitTransaction method found on 1AM API.');
         },
@@ -160,7 +176,7 @@ export default function DeployPage() {
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('3/4: Generating ZK proof & submitting to 1AM for signature...');
+      setStatus('3/4: Generating ZK proof & requesting signature in 1AM...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
