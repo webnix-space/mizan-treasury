@@ -6,8 +6,9 @@ import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-p
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
 
+// Align network ID with Preprod network prefix (mn_...preprod)
 try {
-  setNetworkId('testnet');
+  setNetworkId('preprod');
 } catch (_) {
   try {
     setNetworkId('undeployed');
@@ -75,17 +76,19 @@ export default function DeployPage() {
 
       const api = typeof entry.connect === 'function' ? await entry.connect() : (typeof entry.enable === 'function' ? await entry.enable() : entry);
 
-      setStatus('2/4: Retrieving addresses and network configuration...');
+      // Explicitly sync network ID to preprod
+      try {
+        setNetworkId('preprod');
+      } catch (_) {}
+
+      setStatus('2/4: Retrieving keys and configuring providers...');
 
       const unshieldedRaw = typeof api.getUnshieldedAddress === 'function' ? await api.getUnshieldedAddress() : null;
       const dustRaw = typeof api.getDustAddress === 'function' ? await api.getDustAddress() : null;
-      let shielded = null;
-      if (typeof api.getShieldedAddresses === 'function') {
-        shielded = await api.getShieldedAddresses();
-      }
+      const shieldedRaw = typeof api.getShieldedAddresses === 'function' ? await api.getShieldedAddresses() : null;
 
       const unshieldedKey = extractString(unshieldedRaw) || extractString(dustRaw);
-      const shieldedKey = extractString(shielded);
+      const shieldedKey = extractString(shieldedRaw);
       const activeKey = unshieldedKey || shieldedKey;
 
       if (!activeKey) {
@@ -99,16 +102,19 @@ export default function DeployPage() {
       const INDEXER_WS = 'wss://api-preprod.1am.xyz/api/v4/graphql/ws';
       const PROOF_SERVER = 'https://api-preprod.1am.xyz';
 
-      // Pass window.WebSocket explicitly to avoid isomorphic-ws bundling issues
       const nativeWs = typeof window !== 'undefined' ? (window.WebSocket as any) : undefined;
       const publicDataProvider = api.publicDataProvider || indexerPublicDataProvider(INDEXER_HTTP, INDEXER_WS, nativeWs);
       const proofProvider = api.proofProvider || httpClientProofProvider(PROOF_SERVER);
 
+      // Create a unified wallet provider bridge
+      const coinPublicKey = unshieldedKey || shieldedKey;
+      const encryptionPublicKey = shieldedKey || unshieldedKey;
+
       const walletProvider = {
-        coinPublicKey: activeKey,
-        encryptionPublicKey: shieldedKey || activeKey,
-        getCoinPublicKey: async () => activeKey,
-        getEncryptionPublicKey: async () => shieldedKey || activeKey,
+        coinPublicKey,
+        encryptionPublicKey,
+        getCoinPublicKey: () => coinPublicKey,
+        getEncryptionPublicKey: () => encryptionPublicKey,
         balanceTx: async (tx: any, ttl?: any) => {
           if (typeof api.balanceUnsealedTransaction === 'function') return api.balanceUnsealedTransaction(tx);
           if (typeof api.balanceSealedTransaction === 'function') return api.balanceSealedTransaction(tx);
@@ -120,7 +126,10 @@ export default function DeployPage() {
       const midnightProvider = {
         submitTx: async (tx: any) => {
           if (typeof api.submitTransaction === 'function') return api.submitTransaction(tx);
-          return (api.midnightProvider || api).submitTx(tx);
+          if (api.midnightProvider && typeof api.midnightProvider.submitTx === 'function') {
+            return api.midnightProvider.submitTx(tx);
+          }
+          throw new Error('No submission endpoint available on wallet.');
         },
       };
 
@@ -138,7 +147,7 @@ export default function DeployPage() {
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('3/4: Generating witness proof and requesting 1AM confirmation...');
+      setStatus('3/4: Generating ZK proof & submitting to 1AM for signature...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
