@@ -39,12 +39,10 @@ function extractString(val: any): string | null {
   return null;
 }
 
-// Derive CPK and EPK directly from 1AM's shielded address
 function deriveKeysFromShieldedAddress(shieldedAddr: string) {
   const decoded = bech32m.decode(shieldedAddr as any, 150) || bech32.decode(shieldedAddr as any, 150);
   const bytes = bech32.fromWords(decoded.words);
   
-  // Midnight shielded address is 64 bytes: 32 bytes CPK + 32 bytes EPK
   const cpkBytes = bytes.slice(0, 32);
   const epkBytes = bytes.slice(32, 64);
 
@@ -117,7 +115,6 @@ export default function DeployPage() {
 
       setDiag(`Shielded CPK: ${coinPk.slice(0, 24)}...`);
 
-      // Official 1AM Preprod Endpoints
       const INDEXER_HTTP = 'https://api-preprod.1am.xyz/api/v4/graphql';
       const INDEXER_WS = 'wss://api-preprod.1am.xyz/api/v4/graphql/ws';
       const PROOF_SERVER = 'https://api-preprod.1am.xyz';
@@ -163,11 +160,11 @@ export default function DeployPage() {
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('3/4: Generating ZK proof & awaiting 1AM approval...');
+      setStatus('3/4: Generating ZK proof & submitting to 1AM for signature...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
-        args: [1_000_000n],
+        args: [],
         privateStateKey: 'treasuryVaultPrivateState',
         initialPrivateState: {},
       });
