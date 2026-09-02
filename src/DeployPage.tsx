@@ -6,7 +6,6 @@ import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-p
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
 
-// Align network ID with Preprod network prefix (mn_...preprod)
 try {
   setNetworkId('preprod');
 } catch (_) {
@@ -25,16 +24,20 @@ function inMemoryPrivateStateProvider() {
   };
 }
 
-function extractString(val: any): string | null {
-  if (!val) return null;
-  if (typeof val === 'string' && val.trim().length > 0) return val.trim();
-  if (Array.isArray(val) && val.length > 0) return extractString(val[0]);
-  if (typeof val === 'object') {
-    if (typeof val.unshieldedAddress === 'string') return val.unshieldedAddress;
-    if (typeof val.dustAddress === 'string') return val.dustAddress;
-    if (typeof val.shieldedAddress === 'string') return val.shieldedAddress;
-    if (typeof val.address === 'string') return val.address;
-    if (typeof val.bech32 === 'string') return val.bech32;
+function extractKeyWithPrefix(obj: any, prefix: string): string | null {
+  if (!obj) return null;
+  if (typeof obj === 'string' && obj.startsWith(prefix)) return obj.trim();
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const found = extractKeyWithPrefix(item, prefix);
+      if (found) return found;
+    }
+  }
+  if (typeof obj === 'object') {
+    for (const val of Object.values(obj)) {
+      const found = extractKeyWithPrefix(val, prefix);
+      if (found) return found;
+    }
   }
   return null;
 }
@@ -46,7 +49,7 @@ export default function DeployPage() {
   const [contractAddress, setContractAddress] = useState<string>('');
   const [txHash, setTxHash] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
-  const [accountAddr, setAccountAddr] = useState<string>('');
+  const [diag, setDiag] = useState<string>('');
 
   useEffect(() => {
     const midnight = (window as any).midnight;
@@ -67,7 +70,7 @@ export default function DeployPage() {
 
       const midnight = (window as any).midnight;
       if (!midnight) {
-        throw new Error('1AM wallet extension not detected.');
+        throw new Error('1AM wallet extension not found.');
       }
 
       const walletKey = selectedWallet || Object.keys(midnight)[0];
@@ -76,28 +79,52 @@ export default function DeployPage() {
 
       const api = typeof entry.connect === 'function' ? await entry.connect() : (typeof entry.enable === 'function' ? await entry.enable() : entry);
 
-      // Explicitly sync network ID to preprod
-      try {
-        setNetworkId('preprod');
-      } catch (_) {}
+      setStatus('2/4: Resolving cryptographic shield keys (shield-cpk / shield-epk)...');
 
-      setStatus('2/4: Retrieving keys and configuring providers...');
+      // 1. Check direct methods on API
+      let coinPk: string | null = null;
+      let encPk: string | null = null;
 
-      const unshieldedRaw = typeof api.getUnshieldedAddress === 'function' ? await api.getUnshieldedAddress() : null;
-      const dustRaw = typeof api.getDustAddress === 'function' ? await api.getDustAddress() : null;
-      const shieldedRaw = typeof api.getShieldedAddresses === 'function' ? await api.getShieldedAddresses() : null;
-
-      const unshieldedKey = extractString(unshieldedRaw) || extractString(dustRaw);
-      const shieldedKey = extractString(shieldedRaw);
-      const activeKey = unshieldedKey || shieldedKey;
-
-      if (!activeKey) {
-        throw new Error('No address found in 1AM wallet.');
+      if (typeof api.getCoinPublicKey === 'function') {
+        coinPk = await api.getCoinPublicKey();
+      }
+      if (typeof api.getEncryptionPublicKey === 'function') {
+        encPk = await api.getEncryptionPublicKey();
       }
 
-      setAccountAddr(`Unshielded: ${unshieldedKey || 'None'} | Shielded: ${shieldedKey || 'None'}`);
+      // 2. Deep scan the 1AM state / config tree if methods are not direct
+      if (!coinPk || !encPk) {
+        let fullDump: any = {};
+        if (typeof api.getConfiguration === 'function') {
+          fullDump.config = await api.getConfiguration();
+        }
+        if (typeof api.getConnectionStatus === 'function') {
+          fullDump.status = await api.getConnectionStatus();
+        }
 
-      // Official 1AM Preprod Endpoints
+        // Try extracting keys matching official Midnight Bech32 HRP prefixes
+        if (!coinPk) coinPk = extractKeyWithPrefix({ api, fullDump }, 'mn_shield-cpk');
+        if (!encPk) encPk = extractKeyWithPrefix({ api, fullDump }, 'mn_shield-epk');
+      }
+
+      // Fallback: If 1AM exposes them via walletProvider
+      if (!coinPk && api.walletProvider && typeof api.walletProvider.getCoinPublicKey === 'function') {
+        coinPk = await api.walletProvider.getCoinPublicKey();
+      }
+      if (!encPk && api.walletProvider && typeof api.walletProvider.getEncryptionPublicKey === 'function') {
+        encPk = await api.walletProvider.getEncryptionPublicKey();
+      }
+
+      // If still not isolated, check if 1AM's internal state exposes them
+      if (!coinPk || !encPk) {
+        const methods = Object.keys(api);
+        setDiag(`Available API methods: ${methods.join(', ')}`);
+        throw new Error('1AM wallet did not provide shield-cpk / shield-epk public keys. Check developer console / status below.');
+      }
+
+      setDiag(`CPK: ${coinPk.slice(0, 22)}... | EPK: ${encPk.slice(0, 22)}...`);
+
+      // 1AM preprod endpoints
       const INDEXER_HTTP = 'https://api-preprod.1am.xyz/api/v4/graphql';
       const INDEXER_WS = 'wss://api-preprod.1am.xyz/api/v4/graphql/ws';
       const PROOF_SERVER = 'https://api-preprod.1am.xyz';
@@ -106,15 +133,11 @@ export default function DeployPage() {
       const publicDataProvider = api.publicDataProvider || indexerPublicDataProvider(INDEXER_HTTP, INDEXER_WS, nativeWs);
       const proofProvider = api.proofProvider || httpClientProofProvider(PROOF_SERVER);
 
-      // Create a unified wallet provider bridge
-      const coinPublicKey = unshieldedKey || shieldedKey;
-      const encryptionPublicKey = shieldedKey || unshieldedKey;
-
       const walletProvider = {
-        coinPublicKey,
-        encryptionPublicKey,
-        getCoinPublicKey: () => coinPublicKey,
-        getEncryptionPublicKey: () => encryptionPublicKey,
+        coinPublicKey: coinPk,
+        encryptionPublicKey: encPk,
+        getCoinPublicKey: () => coinPk,
+        getEncryptionPublicKey: () => encPk,
         balanceTx: async (tx: any, ttl?: any) => {
           if (typeof api.balanceUnsealedTransaction === 'function') return api.balanceUnsealedTransaction(tx);
           if (typeof api.balanceSealedTransaction === 'function') return api.balanceSealedTransaction(tx);
@@ -159,8 +182,8 @@ export default function DeployPage() {
       const addr = deployed.deployTxData?.public?.contractAddress || (deployed as any).contractAddress || 'Confirmed on-chain';
       const hash = deployed.deployTxData?.public?.txHash || (deployed as any).txHash || '';
 
-      setContractAddress(extractString(addr) || String(addr));
-      setTxHash(extractString(hash) || String(hash));
+      setContractAddress(String(addr));
+      setTxHash(String(hash));
       setStatus('4/4: Treasury Vault successfully deployed on Midnight Preprod!');
     } catch (err: any) {
       setStatus(`Execution Error: ${err.message || String(err)}`);
@@ -206,8 +229,8 @@ export default function DeployPage() {
 
       <p style={{ marginTop: '1.2rem', wordBreak: 'break-all', color: '#94a3b8', fontSize: '0.95rem' }}>{status}</p>
 
-      {accountAddr && (
-        <p style={{ fontSize: '0.8rem', color: '#64748b', wordBreak: 'break-all' }}>{accountAddr}</p>
+      {diag && (
+        <p style={{ fontSize: '0.8rem', color: '#64748b', wordBreak: 'break-all' }}>{diag}</p>
       )}
 
       {contractAddress && (
