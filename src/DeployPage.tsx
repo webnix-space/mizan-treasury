@@ -5,6 +5,7 @@ import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
+import { bech32, bech32m } from 'bech32';
 
 try {
   setNetworkId('preprod');
@@ -24,22 +25,37 @@ function inMemoryPrivateStateProvider() {
   };
 }
 
-function extractKeyWithPrefix(obj: any, prefix: string): string | null {
-  if (!obj) return null;
-  if (typeof obj === 'string' && obj.startsWith(prefix)) return obj.trim();
-  if (Array.isArray(obj)) {
-    for (const item of obj) {
-      const found = extractKeyWithPrefix(item, prefix);
-      if (found) return found;
-    }
-  }
-  if (typeof obj === 'object') {
-    for (const val of Object.values(obj)) {
-      const found = extractKeyWithPrefix(val, prefix);
-      if (found) return found;
-    }
+function extractString(val: any): string | null {
+  if (!val) return null;
+  if (typeof val === 'string' && val.trim().length > 0) return val.trim();
+  if (Array.isArray(val) && val.length > 0) return extractString(val[0]);
+  if (typeof val === 'object') {
+    if (typeof val.unshieldedAddress === 'string') return val.unshieldedAddress;
+    if (typeof val.dustAddress === 'string') return val.dustAddress;
+    if (typeof val.shieldedAddress === 'string') return val.shieldedAddress;
+    if (typeof val.address === 'string') return val.address;
+    if (typeof val.bech32 === 'string') return val.bech32;
   }
   return null;
+}
+
+// Derive CPK and EPK directly from 1AM's shielded address
+function deriveKeysFromShieldedAddress(shieldedAddr: string) {
+  const decoded = bech32m.decode(shieldedAddr as any, 150) || bech32.decode(shieldedAddr as any, 150);
+  const bytes = bech32.fromWords(decoded.words);
+  
+  // Midnight shielded address is 64 bytes: 32 bytes CPK + 32 bytes EPK
+  const cpkBytes = bytes.slice(0, 32);
+  const epkBytes = bytes.slice(32, 64);
+
+  const cpkWords = bech32.toWords(cpkBytes);
+  const epkWords = bech32.toWords(epkBytes);
+
+  const netPrefix = decoded.prefix.includes('preprod') ? '_preprod' : '';
+  const cpk = bech32m.encode(`mn_shield-cpk${netPrefix}`, cpkWords, 150);
+  const epk = bech32m.encode(`mn_shield-epk${netPrefix}`, epkWords, 150);
+
+  return { cpk, epk };
 }
 
 export default function DeployPage() {
@@ -79,52 +95,29 @@ export default function DeployPage() {
 
       const api = typeof entry.connect === 'function' ? await entry.connect() : (typeof entry.enable === 'function' ? await entry.enable() : entry);
 
-      setStatus('2/4: Resolving cryptographic shield keys (shield-cpk / shield-epk)...');
+      setStatus('2/4: Extracting shielded keys & preparing indexer provider...');
 
-      // 1. Check direct methods on API
-      let coinPk: string | null = null;
-      let encPk: string | null = null;
+      const shieldedRaw = typeof api.getShieldedAddresses === 'function' ? await api.getShieldedAddresses() : null;
+      const shieldedAddr = extractString(shieldedRaw);
 
-      if (typeof api.getCoinPublicKey === 'function') {
-        coinPk = await api.getCoinPublicKey();
-      }
-      if (typeof api.getEncryptionPublicKey === 'function') {
-        encPk = await api.getEncryptionPublicKey();
+      if (!shieldedAddr) {
+        throw new Error('Could not retrieve shielded address from 1AM. Ensure account is unlocked.');
       }
 
-      // 2. Deep scan the 1AM state / config tree if methods are not direct
-      if (!coinPk || !encPk) {
-        let fullDump: any = {};
-        if (typeof api.getConfiguration === 'function') {
-          fullDump.config = await api.getConfiguration();
-        }
-        if (typeof api.getConnectionStatus === 'function') {
-          fullDump.status = await api.getConnectionStatus();
-        }
+      let coinPk: string;
+      let encPk: string;
 
-        // Try extracting keys matching official Midnight Bech32 HRP prefixes
-        if (!coinPk) coinPk = extractKeyWithPrefix({ api, fullDump }, 'mn_shield-cpk');
-        if (!encPk) encPk = extractKeyWithPrefix({ api, fullDump }, 'mn_shield-epk');
+      try {
+        const derived = deriveKeysFromShieldedAddress(shieldedAddr);
+        coinPk = derived.cpk;
+        encPk = derived.epk;
+      } catch (e: any) {
+        throw new Error(`Failed to decode shield address: ${e.message}`);
       }
 
-      // Fallback: If 1AM exposes them via walletProvider
-      if (!coinPk && api.walletProvider && typeof api.walletProvider.getCoinPublicKey === 'function') {
-        coinPk = await api.walletProvider.getCoinPublicKey();
-      }
-      if (!encPk && api.walletProvider && typeof api.walletProvider.getEncryptionPublicKey === 'function') {
-        encPk = await api.walletProvider.getEncryptionPublicKey();
-      }
+      setDiag(`Shielded CPK: ${coinPk.slice(0, 24)}...`);
 
-      // If still not isolated, check if 1AM's internal state exposes them
-      if (!coinPk || !encPk) {
-        const methods = Object.keys(api);
-        setDiag(`Available API methods: ${methods.join(', ')}`);
-        throw new Error('1AM wallet did not provide shield-cpk / shield-epk public keys. Check developer console / status below.');
-      }
-
-      setDiag(`CPK: ${coinPk.slice(0, 22)}... | EPK: ${encPk.slice(0, 22)}...`);
-
-      // 1AM preprod endpoints
+      // Official 1AM Preprod Endpoints
       const INDEXER_HTTP = 'https://api-preprod.1am.xyz/api/v4/graphql';
       const INDEXER_WS = 'wss://api-preprod.1am.xyz/api/v4/graphql/ws';
       const PROOF_SERVER = 'https://api-preprod.1am.xyz';
@@ -152,7 +145,7 @@ export default function DeployPage() {
           if (api.midnightProvider && typeof api.midnightProvider.submitTx === 'function') {
             return api.midnightProvider.submitTx(tx);
           }
-          throw new Error('No submission endpoint available on wallet.');
+          throw new Error('No submitTransaction method found on 1AM API.');
         },
       };
 
@@ -170,7 +163,7 @@ export default function DeployPage() {
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('3/4: Generating ZK proof & submitting to 1AM for signature...');
+      setStatus('3/4: Generating ZK proof & awaiting 1AM approval...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
