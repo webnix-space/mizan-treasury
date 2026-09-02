@@ -64,6 +64,7 @@ export default function DeployPage() {
   const [txHash, setTxHash] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [diag, setDiag] = useState<string>('');
+  const [activeStep, setActiveStep] = useState<string>('');
 
   useEffect(() => {
     const midnight = (window as any).midnight;
@@ -80,11 +81,12 @@ export default function DeployPage() {
   const handleDeploy = async () => {
     try {
       setLoading(true);
-      setStatus('1/4: Connecting to 1AM Wallet...');
+      setActiveStep('Connecting to 1AM...');
+      setStatus('Step 1: Connecting to 1AM wallet...');
 
       const midnight = (window as any).midnight;
       if (!midnight) {
-        throw new Error('1AM wallet extension not found.');
+        throw new Error('1AM wallet extension not detected in window.midnight.');
       }
 
       const walletKey = selectedWallet || Object.keys(midnight)[0];
@@ -93,20 +95,21 @@ export default function DeployPage() {
 
       const api = typeof entry.connect === 'function' ? await entry.connect() : (typeof entry.enable === 'function' ? await entry.enable() : entry);
 
-      setStatus('2/4: Resolving account keys...');
+      setActiveStep('Reading addresses...');
+      setStatus('Step 2: Deriving keys from shielded address...');
 
       const shieldedRaw = typeof api.getShieldedAddresses === 'function' ? await api.getShieldedAddresses() : null;
       const shieldedAddr = extractString(shieldedRaw);
 
       if (!shieldedAddr) {
-        throw new Error('Could not retrieve shielded address from 1AM. Unlock your wallet on Preprod.');
+        throw new Error('Could not retrieve shielded address from 1AM.');
       }
 
       const derived = deriveKeysFromShieldedAddress(shieldedAddr);
       const coinPk = derived.cpk;
       const encPk = derived.epk;
 
-      setDiag(`Shielded CPK: ${coinPk.slice(0, 24)}...`);
+      setDiag(`CPK: ${coinPk.slice(0, 24)}...`);
 
       const INDEXER_HTTP = 'https://api-preprod.1am.xyz/api/v4/graphql';
       const INDEXER_WS = 'wss://api-preprod.1am.xyz/api/v4/graphql/ws';
@@ -116,46 +119,55 @@ export default function DeployPage() {
       const publicDataProvider = api.publicDataProvider || indexerPublicDataProvider(INDEXER_HTTP, INDEXER_WS, nativeWs);
       const proofProvider = httpClientProofProvider(PROOF_SERVER);
 
-      // Resilient WalletProvider for 1AM
       const walletProvider = {
         coinPublicKey: coinPk,
         encryptionPublicKey: encPk,
         getCoinPublicKey: () => coinPk,
         getEncryptionPublicKey: () => encPk,
         balanceTx: async (tx: any, ttl?: any) => {
-          setStatus('Balancing transaction with 1AM...');
+          setActiveStep('Invoking balanceTx...');
+          setStatus('Step 3a: Calling wallet balancing (Check 1AM!)...');
+          
           try {
-            // Check if 1AM accepts the unsealed transaction
             if (typeof api.balanceUnsealedTransaction === 'function') {
               const res = await api.balanceUnsealedTransaction(tx);
               if (res) return res;
             }
           } catch (e: any) {
-            console.warn('1AM balanceUnsealedTransaction bypassed:', e.message);
+            console.error('Failed on balanceUnsealedTransaction:', e);
+            throw new Error(`balanceUnsealedTransaction failed: ${e.message || String(e)}`);
           }
-          // If 1AM auto-balances at submission time or uses dust sponsorship, pass tx forward
+
+          try {
+            if (typeof api.balanceTx === 'function') {
+              return await api.balanceTx(tx, ttl);
+            }
+          } catch (e: any) {
+            console.error('Failed on balanceTx:', e);
+            throw new Error(`balanceTx failed: ${e.message || String(e)}`);
+          }
+
           return tx;
         },
       };
 
-      // MidnightProvider handles the final submission prompt in 1AM
       const midnightProvider = {
         submitTx: async (tx: any) => {
-          setStatus('Awaiting 1AM confirmation & signature...');
+          setActiveStep('Invoking submitTx...');
+          setStatus('Step 3b: Submitting to Midnight network...');
           
-          if (typeof api.submitTransaction === 'function') {
-            return await api.submitTransaction(tx);
-          }
-          if (typeof api.balanceSealedTransaction === 'function') {
-            const sealed = await api.balanceSealedTransaction(tx);
-            if (sealed && typeof api.submitTransaction === 'function') {
-              return await api.submitTransaction(sealed);
+          try {
+            if (typeof api.submitTransaction === 'function') {
+              return await api.submitTransaction(tx);
             }
+            if (api.midnightProvider && typeof api.midnightProvider.submitTx === 'function') {
+              return await api.midnightProvider.submitTx(tx);
+            }
+          } catch (e: any) {
+            console.error('Failed on submitTx:', e);
+            throw new Error(`submitTx failed: ${e.message || String(e)}`);
           }
-          if (api.midnightProvider && typeof api.midnightProvider.submitTx === 'function') {
-            return await api.midnightProvider.submitTx(tx);
-          }
-          throw new Error('No submission endpoint available on 1AM.');
+          throw new Error('No submission method on 1AM API');
         },
       };
 
@@ -173,7 +185,8 @@ export default function DeployPage() {
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('3/4: Proving transaction against 1AM Proof Server...');
+      setActiveStep('deployContract executing...');
+      setStatus('Step 3: Generating proof & submitting contract...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
@@ -187,7 +200,8 @@ export default function DeployPage() {
 
       setContractAddress(String(addr));
       setTxHash(String(hash));
-      setStatus('4/4: Treasury Vault successfully deployed on Midnight Preprod!');
+      setStatus('Success! Vault successfully deployed on Midnight Preprod!');
+      setActiveStep('Done');
     } catch (err: any) {
       setStatus(`Execution Error: ${err.message || String(err)}`);
     } finally {
@@ -231,6 +245,10 @@ export default function DeployPage() {
       </button>
 
       <p style={{ marginTop: '1.2rem', wordBreak: 'break-all', color: '#94a3b8', fontSize: '0.95rem' }}>{status}</p>
+
+      {activeStep && (
+        <p style={{ fontSize: '0.85rem', color: '#38bdf8' }}>Last trace: {activeStep}</p>
+      )}
 
       {diag && (
         <p style={{ fontSize: '0.8rem', color: '#64748b', wordBreak: 'break-all' }}>{diag}</p>
