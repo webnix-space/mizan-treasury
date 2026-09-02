@@ -42,7 +42,7 @@ function extractString(val: any): string | null {
 function deriveKeysFromShieldedAddress(shieldedAddr: string) {
   const decoded = bech32m.decode(shieldedAddr as any, 150) || bech32.decode(shieldedAddr as any, 150);
   const bytes = bech32.fromWords(decoded.words);
-  
+
   const cpkBytes = bytes.slice(0, 32);
   const epkBytes = bytes.slice(32, 64);
 
@@ -93,7 +93,7 @@ export default function DeployPage() {
 
       const api = typeof entry.connect === 'function' ? await entry.connect() : (typeof entry.enable === 'function' ? await entry.enable() : entry);
 
-      setStatus('2/4: Resolving keys & proof servers...');
+      setStatus('2/4: Resolving keys & configuring HTTP proof provider...');
 
       const shieldedRaw = typeof api.getShieldedAddresses === 'function' ? await api.getShieldedAddresses() : null;
       const shieldedAddr = extractString(shieldedRaw);
@@ -108,24 +108,17 @@ export default function DeployPage() {
 
       setDiag(`Shielded CPK: ${coinPk.slice(0, 24)}...`);
 
+      // 1AM preprod hosted infrastructure
       const INDEXER_HTTP = 'https://api-preprod.1am.xyz/api/v4/graphql';
       const INDEXER_WS = 'wss://api-preprod.1am.xyz/api/v4/graphql/ws';
       const PROOF_SERVER = 'https://api-preprod.1am.xyz';
 
       const nativeWs = typeof window !== 'undefined' ? (window.WebSocket as any) : undefined;
       const publicDataProvider = api.publicDataProvider || indexerPublicDataProvider(INDEXER_HTTP, INDEXER_WS, nativeWs);
-      
-      let proofProvider = null;
-      if (typeof api.getProvingProvider === 'function') {
-        try {
-          proofProvider = await api.getProvingProvider();
-        } catch (_) {}
-      }
-      if (!proofProvider) {
-        proofProvider = api.proofProvider || httpClientProofProvider(PROOF_SERVER);
-      }
 
-      // 1AM v4 balancing adapter: tries all 1AM balance signatures
+      // Explicit standard Midnight HTTP ProofProvider implementation
+      const proofProvider = httpClientProofProvider(PROOF_SERVER);
+
       const walletProvider = {
         coinPublicKey: coinPk,
         encryptionPublicKey: encPk,
@@ -133,33 +126,15 @@ export default function DeployPage() {
         getEncryptionPublicKey: () => encPk,
         balanceTx: async (tx: any, ttl?: any) => {
           setStatus('Triggering 1AM confirmation dialog...');
-          
-          // Strategy 1: balanceUnsealedTransaction with raw or serialized transaction
           if (typeof api.balanceUnsealedTransaction === 'function') {
-            try {
-              return await api.balanceUnsealedTransaction(tx);
-            } catch (err: any) {
-              // If object serialization was rejected, try passing hex string if tx has serialize method
-              if (tx && typeof tx.serialize === 'function') {
-                return await api.balanceUnsealedTransaction(tx.serialize());
-              }
-              if (tx && tx.bytes) {
-                return await api.balanceUnsealedTransaction(tx.bytes);
-              }
-              throw err;
-            }
+            return await api.balanceUnsealedTransaction(tx);
           }
-
-          // Strategy 2: balanceTx standard
           if (typeof api.balanceTx === 'function') {
             return await api.balanceTx(tx, ttl);
           }
-
-          // Strategy 3: balanceSealedTransaction
           if (typeof api.balanceSealedTransaction === 'function') {
             return await api.balanceSealedTransaction(tx);
           }
-
           return tx;
         },
       };
@@ -173,7 +148,7 @@ export default function DeployPage() {
           if (api.midnightProvider && typeof api.midnightProvider.submitTx === 'function') {
             return await api.midnightProvider.submitTx(tx);
           }
-          throw new Error('No submit method on 1AM API');
+          throw new Error('No submitTransaction method found on 1AM API.');
         },
       };
 
@@ -191,7 +166,7 @@ export default function DeployPage() {
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
-      setStatus('3/4: Generating circuit proof & opening 1AM signing prompt...');
+      setStatus('3/4: Generating circuit proof with 1AM Proof Server...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
