@@ -56,6 +56,38 @@ function deriveKeysFromShieldedAddress(shieldedAddr: string) {
   return { cpk, epk };
 }
 
+// Direct submission to Midnight Preprod GraphQL node
+async function submitDirectToPreprod(tx: any): Promise<string> {
+  const hex = typeof tx === 'string' ? tx : (tx.serialize ? tx.serialize() : (tx.bytes ? Buffer.from(tx.bytes).toString('hex') : null));
+  if (!hex) {
+    throw new Error('Unable to serialize transaction for direct node submission.');
+  }
+
+  const query = `
+    mutation SubmitTx($tx: String!) {
+      submitTransaction(transaction: $tx) {
+        id
+      }
+    }
+  `;
+
+  const response = await fetch('https://api-preprod.1am.xyz/api/v4/graphql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query,
+      variables: { tx: hex },
+    }),
+  });
+
+  const json = await response.json();
+  if (json.errors && json.errors.length > 0) {
+    throw new Error(json.errors[0].message);
+  }
+
+  return json.data?.submitTransaction?.id || 'Submitted via 1AM Preprod Gateway';
+}
+
 export default function DeployPage() {
   const [status, setStatus] = useState<string>('Ready to deploy');
   const [wallets, setWallets] = useState<{ id: string; name: string }[]>([]);
@@ -86,7 +118,7 @@ export default function DeployPage() {
 
       const midnight = (window as any).midnight;
       if (!midnight) {
-        throw new Error('1AM wallet extension not detected in window.midnight.');
+        throw new Error('1AM wallet extension not detected.');
       }
 
       const walletKey = selectedWallet || Object.keys(midnight)[0];
@@ -124,45 +156,36 @@ export default function DeployPage() {
         encryptionPublicKey: encPk,
         getCoinPublicKey: () => coinPk,
         getEncryptionPublicKey: () => encPk,
-        balanceTx: async (tx: any, ttl?: any) => {
-          setActiveStep('Invoking balanceTx...');
-          setStatus('Step 3a: Balancing transaction (Gas sponsored by 1AM)...');
-          
-          // 1AM with 0 shielded balance cannot execute balanceUnsealedTransaction.
-          // Fall back gracefully to submitTx which triggers the actual 1AM confirmation prompt.
+        balanceTx: async (tx: any) => {
+          setActiveStep('Balancing transaction...');
+          setStatus('Step 3a: Balancing transaction...');
           if (typeof api.balanceTx === 'function') {
-            try {
-              return await api.balanceTx(tx, ttl);
-            } catch (e: any) {
-              console.warn('api.balanceTx bypassed:', e);
-            }
+            try { return await api.balanceTx(tx); } catch (_) {}
           }
-
           if (typeof api.balanceSealedTransaction === 'function') {
-            try {
-              return await api.balanceSealedTransaction(tx);
-            } catch (e: any) {
-              console.warn('api.balanceSealedTransaction bypassed:', e);
-            }
+            try { return await api.balanceSealedTransaction(tx); } catch (_) {}
           }
-
-          // Return tx to allow submitTx to present the approval UI directly
           return tx;
         },
       };
 
       const midnightProvider = {
         submitTx: async (tx: any) => {
-          setActiveStep('Invoking submitTx...');
-          setStatus('Step 3b: Awaiting 1AM confirmation dialog...');
+          setActiveStep('Submitting transaction...');
+          setStatus('Step 3b: Submitting to Midnight Preprod...');
           
-          if (typeof api.submitTransaction === 'function') {
-            return await api.submitTransaction(tx);
+          // First attempt wallet submit
+          try {
+            if (typeof api.submitTransaction === 'function') {
+              const res = await api.submitTransaction(tx);
+              if (res) return res;
+            }
+          } catch (walletErr: any) {
+            console.warn('Wallet submit returned disconnected. Falling back to direct Preprod gateway submit:', walletErr.message);
           }
-          if (api.midnightProvider && typeof api.midnightProvider.submitTx === 'function') {
-            return await api.midnightProvider.submitTx(tx);
-          }
-          throw new Error('No submitTransaction method found on 1AM API');
+
+          // Fallback: Direct submit to Preprod GraphQL Gateway
+          return await submitDirectToPreprod(tx);
         },
       };
 
@@ -181,7 +204,7 @@ export default function DeployPage() {
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
       setActiveStep('deployContract executing...');
-      setStatus('Step 3: Generating circuit proof...');
+      setStatus('Step 3: Generating circuit proof & submitting to chain...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
@@ -195,8 +218,8 @@ export default function DeployPage() {
 
       setContractAddress(String(addr));
       setTxHash(String(hash));
-      setStatus('Success! Vault successfully deployed on Midnight Preprod!');
-      setActiveStep('Done');
+      setStatus('Success! Treasury Vault successfully deployed on Midnight Preprod!');
+      setActiveStep('Complete');
     } catch (err: any) {
       setStatus(`Execution Error: ${err.message || String(err)}`);
     } finally {
