@@ -111,11 +111,14 @@ export default function DeployPage() {
 
       setDiag(`CPK: ${coinPk.slice(0, 24)}...`);
 
+      // Official Preprod Infrastructure
       const INDEXER_HTTP = 'https://indexer.preprod.midnight.network/api/v1/graphql';
       const INDEXER_WS = 'wss://indexer.preprod.midnight.network/api/v1/graphql/ws';
       const PROOF_SERVER = 'https://api-preprod.1am.xyz';
 
       const nativeWs = typeof window !== 'undefined' ? (window.WebSocket as any) : undefined;
+      
+      // Use 1AM's native public provider if attached, otherwise our indexer
       const publicDataProvider = api.publicDataProvider || indexerPublicDataProvider(INDEXER_HTTP, INDEXER_WS, nativeWs);
       const proofProvider = httpClientProofProvider(PROOF_SERVER);
 
@@ -127,6 +130,7 @@ export default function DeployPage() {
         balanceTx: async (tx: any) => {
           setActiveStep('Balancing transaction...');
           setStatus('Step 3a: Balancing transaction...');
+          
           if (typeof api.balanceTx === 'function') {
             try { return await api.balanceTx(tx); } catch (_) {}
           }
@@ -137,57 +141,41 @@ export default function DeployPage() {
         },
       };
 
+      // Direct submission delegator
       const midnightProvider = {
         submitTx: async (tx: any) => {
           setActiveStep('Submitting transaction...');
-          setStatus('Step 3b: Submitting via Midnight Provider...');
+          setStatus('Step 3b: Submitting transaction to network...');
 
-          // 1. Try publicDataProvider's built-in submitTx if available
-          if (publicDataProvider && typeof (publicDataProvider as any).submitTx === 'function') {
-            try {
-              return await (publicDataProvider as any).submitTx(tx);
-            } catch (e: any) {
-              console.warn('publicDataProvider.submitTx failed:', e.message);
-            }
-          }
-
-          // 2. Try 1AM submitTransaction
+          // Priority 1: Delegate to 1AM's internal connector
           if (typeof api.submitTransaction === 'function') {
             try {
-              return await api.submitTransaction(tx);
+              const res = await api.submitTransaction(tx);
+              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || JSON.stringify(res));
+            } catch (err: any) {
+              console.warn('1AM submitTransaction error:', err);
+              // If it failed because of UI disconnect, surface that explicitly
+              if (err.message?.includes('disconnected')) {
+                throw new Error('1AM wallet dialog was closed. Keep the 1AM tab open and approve the submission.');
+              }
+            }
+          }
+
+          // Priority 2: Use 1AM's internal midnightProvider
+          if (api.midnightProvider && typeof api.midnightProvider.submitTx === 'function') {
+            try {
+              return await api.midnightProvider.submitTx(tx);
             } catch (e: any) {
-              console.warn('api.submitTransaction failed:', e.message);
+              console.warn('1AM internal submitTx error:', e);
             }
           }
 
-          // 3. Robust GraphQL payload execution with detailed body checking
-          const hex = typeof tx === 'string' ? tx : (tx.serialize ? tx.serialize() : (tx.bytes ? Buffer.from(tx.bytes).toString('hex') : JSON.stringify(tx)));
-          
-          const res = await fetch(INDEXER_HTTP, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query: `mutation Submit($tx: String!) { submitTransaction(transaction: $tx) { id } }`,
-              variables: { tx: hex },
-            }),
-          });
-
-          const text = await res.text();
-          if (!text) {
-            // Empty response with status 200/204 indicates accepted by submitter node
-            return 'tx_submitted_preprod_' + Date.now();
+          // Priority 3: Built-in publicDataProvider submission
+          if (publicDataProvider && typeof (publicDataProvider as any).submitTx === 'function') {
+            return await (publicDataProvider as any).submitTx(tx);
           }
 
-          try {
-            const parsed = JSON.parse(text);
-            if (parsed.errors && parsed.errors.length > 0) {
-              throw new Error(parsed.errors[0].message);
-            }
-            return parsed.data?.submitTransaction?.id || 'tx_preprod_accepted';
-          } catch (jsonErr: any) {
-            if (res.ok) return 'tx_submitted_preprod_' + Date.now();
-            throw new Error(`Submit rejected: ${text.slice(0, 100)}`);
-          }
+          throw new Error('No available submit channel accepted the transaction payload.');
         },
       };
 
@@ -206,7 +194,7 @@ export default function DeployPage() {
       const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
 
       setActiveStep('deployContract executing...');
-      setStatus('Step 3: Generating circuit proof & submitting to chain...');
+      setStatus('Step 3: Generating circuit proof & submitting contract...');
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
