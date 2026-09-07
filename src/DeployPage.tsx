@@ -190,7 +190,8 @@ export default function DeployPage() {
             console.warn('Direct RPC submission error:', rpcErr);
           }
 
-          throw new Error('All submission channels failed.');
+          const apiKeys = Object.keys(api).join(', ');
+          throw new Error(`Submission failed. Available API methods: [${apiKeys}]. Check console.`);
         },
       };
       const providers = {
