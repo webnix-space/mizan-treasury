@@ -150,67 +150,59 @@ export default function DeployPage() {
       };
       const midnightProvider = {
         submitTx: async (tx: any) => {
-          setActiveStep('Broadcasting transaction to Midnight network...');
-          setStatus('Step 3b: Direct network submission...');
+          setActiveStep('Submitting transaction to Preprod gateway...');
+          setStatus('Step 3b: Submitting via Midnight gateway...');
 
-          console.log('Inspecting tx object:', tx);
-
-          // Extract raw Uint8Array from Midnight transaction
-          let bytes: Uint8Array | null = null;
+          let rawBytes: Uint8Array;
           if (tx instanceof Uint8Array) {
-            bytes = tx;
+            rawBytes = tx;
           } else if (typeof tx?.serialize === 'function') {
-            bytes = tx.serialize();
+            rawBytes = tx.serialize();
           } else if (tx?.bytes instanceof Uint8Array) {
-            bytes = tx.bytes;
+            rawBytes = tx.bytes;
           } else if (tx?.raw instanceof Uint8Array) {
-            bytes = tx.raw;
-          }
-
-          if (!bytes) {
-            // Check if 1AM has an internal serializer or export
-            throw new Error(`Unable to extract binary ledger bytes from tx: keys=[${Object.keys(tx || {})}]`);
-          }
-
-          // Substrate SCALE compact-integer encoding for vector length
-          const len = bytes.length;
-          let prefix: number[] = [];
-          if (len <= 63) {
-            prefix = [len << 2];
-          } else if (len <= 16383) {
-            prefix = [(len << 2) | 1, len >> 6];
-          } else if (len <= 1073741823) {
-            prefix = [(len << 2) | 2, len >> 6, len >> 14, len >> 22];
+            rawBytes = tx.raw;
           } else {
-            throw new Error(`Transaction byte length ${len} exceeds compact bounds`);
+            rawBytes = new TextEncoder().encode(typeof tx === 'string' ? tx : JSON.stringify(tx));
           }
 
-          const extrinsic = new Uint8Array(prefix.length + bytes.length);
-          extrinsic.set(prefix, 0);
-          extrinsic.set(bytes, prefix.length);
-
-          const extrinsicHex = '0x' + Array.from(extrinsic, b => b.toString(16).padStart(2, '0')).join('');
-
-          const response = await fetch('https://rpc.preprod.midnight.network', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: Date.now(),
-              method: 'author_submitExtrinsic',
-              params: [extrinsicHex]
-            })
-          });
-
-          const resJson = await response.json();
-          if (resJson.result) {
-            return resJson.result;
+          // Channel 1: Midnight Preprod Indexer / Tx submission service
+          try {
+            const indexerEndpoints = [
+              'https://indexer.preprod.midnight.network/api/v1/graphql',
+              'https://indexer.preprod.midnight.network/submit'
+            ];
+            
+            // Try standard GraphQL mutation if supported
+            const hexPayload = Array.from(rawBytes, b => b.toString(16).padStart(2, '0')).join('');
+            const gqlRes = await fetch('https://indexer.preprod.midnight.network/api/v1/graphql', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                query: `mutation SubmitTx($tx: String!) { submitTransaction(transaction: $tx) }`,
+                variables: { tx: hexPayload }
+              })
+            });
+            const gqlData = await gqlRes.json();
+            if (gqlData?.data?.submitTransaction) {
+              return gqlData.data.submitTransaction;
+            }
+          } catch (e) {
+            console.warn('Indexer gateway submit attempt failed:', e);
           }
-          if (resJson.error) {
-            throw new Error(`RPC submitExtrinsic error: ${JSON.stringify(resJson.error)}`);
+
+          // Channel 2: Delegate to 1AM directly if available
+          if (typeof api.submitTransaction === 'function') {
+            try {
+              const res = await api.submitTransaction(tx);
+              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || JSON.stringify(res));
+            } catch (err: any) {
+              console.warn('1AM submitTransaction error:', err);
+              throw new Error(`1AM submit error: ${err.message || JSON.stringify(err)}`);
+            }
           }
 
-          return extrinsicHex;
+          throw new Error('All submission routes exhausted. Could not submit transaction to Preprod.');
         },
       };
       const providers = {
