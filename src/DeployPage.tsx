@@ -128,70 +128,39 @@ export default function DeployPage() {
         getCoinPublicKey: () => coinPk,
         getEncryptionPublicKey: () => encPk,
         balanceTx: async (tx: any) => {
-          setActiveStep('Balancing transaction...');
+          setActiveStep('Balancing transaction with 1AM...');
           setStatus('Step 3a: Balancing transaction...');
-          
-          if (typeof api.balanceTx === 'function') {
-            try { return await api.balanceTx(tx); } catch (_) {}
+          if (typeof api.balanceUnsealedTransaction === 'function') {
+            try {
+              const res = await api.balanceUnsealedTransaction(tx);
+              if (res) return res;
+            } catch (e) { console.warn('balanceUnsealedTransaction error:', e); }
           }
           if (typeof api.balanceSealedTransaction === 'function') {
-            try { return await api.balanceSealedTransaction(tx); } catch (_) {}
+            try {
+              const res = await api.balanceSealedTransaction(tx);
+              if (res) return res;
+            } catch (e) { console.warn('balanceSealedTransaction error:', e); }
+          }
+          if (typeof api.balanceTx === 'function') {
+            try { return await api.balanceTx(tx); } catch (_) {}
           }
           return tx;
         },
       };
-
-      // Direct submission delegator
       const midnightProvider = {
         submitTx: async (tx: any) => {
-          setActiveStep('Submitting transaction...');
-          setStatus('Step 3b: Submitting transaction to network...');
-
+          setActiveStep('Broadcasting transaction via 1AM...');
+          setStatus('Step 3b: Submitting transaction to 1AM...');
           if (typeof api.submitTransaction === 'function') {
             try {
               const res = await api.submitTransaction(tx);
-              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || JSON.stringify(res));
-            } catch (err) {
-              console.warn('1AM submitTransaction error:', err);
+              return typeof res === 'string' ? res : (res?.txHash || res?.id || res?.hash || JSON.stringify(res));
+            } catch (err: any) {
+              throw new Error(`1AM submitTransaction error: ${err.message || JSON.stringify(err)}`);
             }
           }
-
-          if (api.midnightProvider && typeof api.midnightProvider.submitTx === 'function') {
-            try {
-              return await api.midnightProvider.submitTx(tx);
-            } catch (e) {
-              console.warn('1AM midnightProvider.submitTx error:', e);
-            }
-          }
-
-          if (publicDataProvider && typeof publicDataProvider.submitTx === 'function') {
-            try {
-              return await publicDataProvider.submitTx(tx);
-            } catch (e) {
-              console.warn('publicDataProvider submit error:', e);
-            }
-          }
-
-          try {
-            const rawBytes = typeof tx === 'string' ? tx : (tx.serialize ? tx.serialize() : (tx.bytes ? tx.bytes : JSON.stringify(tx)));
-            const rpcRes = await fetch('https://rpc.preprod.midnight.network', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: Date.now(),
-                method: 'author_submitExtrinsic',
-                params: [rawBytes]
-              })
-            });
-            const rpcData = await rpcRes.json();
-            if (rpcData.result) return rpcData.result;
-          } catch (rpcErr) {
-            console.warn('Direct RPC submission error:', rpcErr);
-          }
-
-          const apiKeys = Object.keys(api).join(', ');
-          throw new Error(`Submission failed. Available API methods: [${apiKeys}]. Check console.`);
+          throw new Error('api.submitTransaction method not found on 1AM');
         },
       };
       const providers = {
