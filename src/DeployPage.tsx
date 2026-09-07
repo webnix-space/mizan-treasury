@@ -148,7 +148,7 @@ export default function DeployPage() {
           setStatus('Step 3b: Submitting transaction to network...');
 
           // Priority 1: Delegate to 1AM's internal connector
-          if (typeof api.submitTransaction === 'function') {
+          if (false) {
             try {
               const res = await api.submitTransaction(tx);
               if (res) return typeof res === 'string' ? res : (res.txHash || res.id || JSON.stringify(res));
@@ -162,7 +162,7 @@ export default function DeployPage() {
           }
 
           // Priority 2: Use 1AM's internal midnightProvider
-          if (api.midnightProvider && typeof api.midnightProvider.submitTx === 'function') {
+          if (false) {
             try {
               return await api.midnightProvider.submitTx(tx);
             } catch (e: any) {
