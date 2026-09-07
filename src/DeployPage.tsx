@@ -153,26 +153,44 @@ export default function DeployPage() {
           setActiveStep('Broadcasting transaction to Midnight network...');
           setStatus('Step 3b: Direct network submission...');
 
-          // 1. Serialize transaction payload to hex/bytes
-          let txHex = '';
-          if (typeof tx === 'string') {
-            txHex = tx;
-          } else if (tx && typeof tx.serialize === 'function') {
-            const raw = tx.serialize();
-            txHex = typeof raw === 'string' ? raw : Array.from(raw, (b: number) => b.toString(16).padStart(2, '0')).join('');
-          } else if (tx?.bytes) {
-            txHex = typeof tx.bytes === 'string' ? tx.bytes : Array.from(tx.bytes, (b: number) => b.toString(16).padStart(2, '0')).join('');
+          console.log('Inspecting tx object:', tx);
+
+          // Extract raw Uint8Array from Midnight transaction
+          let bytes: Uint8Array | null = null;
+          if (tx instanceof Uint8Array) {
+            bytes = tx;
+          } else if (typeof tx?.serialize === 'function') {
+            bytes = tx.serialize();
+          } else if (tx?.bytes instanceof Uint8Array) {
+            bytes = tx.bytes;
+          } else if (tx?.raw instanceof Uint8Array) {
+            bytes = tx.raw;
+          }
+
+          if (!bytes) {
+            // Check if 1AM has an internal serializer or export
+            throw new Error(`Unable to extract binary ledger bytes from tx: keys=[${Object.keys(tx || {})}]`);
+          }
+
+          // Substrate SCALE compact-integer encoding for vector length
+          const len = bytes.length;
+          let prefix: number[] = [];
+          if (len <= 63) {
+            prefix = [len << 2];
+          } else if (len <= 16383) {
+            prefix = [(len << 2) | 1, len >> 6];
+          } else if (len <= 1073741823) {
+            prefix = [(len << 2) | 2, len >> 6, len >> 14, len >> 22];
           } else {
-            txHex = JSON.stringify(tx);
+            throw new Error(`Transaction byte length ${len} exceeds compact bounds`);
           }
 
-          if (!txHex.startsWith('0x') && /^[0-9a-fA-F]+$/.test(txHex)) {
-            txHex = '0x' + txHex;
-          }
+          const extrinsic = new Uint8Array(prefix.length + bytes.length);
+          extrinsic.set(prefix, 0);
+          extrinsic.set(bytes, prefix.length);
 
-          console.log('Broadcasting payload to Midnight RPC...', txHex.slice(0, 50));
+          const extrinsicHex = '0x' + Array.from(extrinsic, b => b.toString(16).padStart(2, '0')).join('');
 
-          // 2. Submit directly to Preprod Substrate RPC
           const response = await fetch('https://rpc.preprod.midnight.network', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -180,7 +198,7 @@ export default function DeployPage() {
               jsonrpc: '2.0',
               id: Date.now(),
               method: 'author_submitExtrinsic',
-              params: [txHex]
+              params: [extrinsicHex]
             })
           });
 
@@ -189,11 +207,10 @@ export default function DeployPage() {
             return resJson.result;
           }
           if (resJson.error) {
-            throw new Error(`RPC Broadcast failed: ${JSON.stringify(resJson.error)}`);
+            throw new Error(`RPC submitExtrinsic error: ${JSON.stringify(resJson.error)}`);
           }
 
-          // Fallback if RPC format differs
-          return txHex;
+          return extrinsicHex;
         },
       };
       const providers = {
