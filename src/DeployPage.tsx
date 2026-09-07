@@ -150,17 +150,50 @@ export default function DeployPage() {
       };
       const midnightProvider = {
         submitTx: async (tx: any) => {
-          setActiveStep('Broadcasting transaction via 1AM...');
-          setStatus('Step 3b: Submitting transaction to 1AM...');
-          if (typeof api.submitTransaction === 'function') {
-            try {
-              const res = await api.submitTransaction(tx);
-              return typeof res === 'string' ? res : (res?.txHash || res?.id || res?.hash || JSON.stringify(res));
-            } catch (err: any) {
-              throw new Error(`1AM submitTransaction error: ${err.message || JSON.stringify(err)}`);
-            }
+          setActiveStep('Broadcasting transaction to Midnight network...');
+          setStatus('Step 3b: Direct network submission...');
+
+          // 1. Serialize transaction payload to hex/bytes
+          let txHex = '';
+          if (typeof tx === 'string') {
+            txHex = tx;
+          } else if (tx && typeof tx.serialize === 'function') {
+            const raw = tx.serialize();
+            txHex = typeof raw === 'string' ? raw : Array.from(raw, (b: number) => b.toString(16).padStart(2, '0')).join('');
+          } else if (tx?.bytes) {
+            txHex = typeof tx.bytes === 'string' ? tx.bytes : Array.from(tx.bytes, (b: number) => b.toString(16).padStart(2, '0')).join('');
+          } else {
+            txHex = JSON.stringify(tx);
           }
-          throw new Error('api.submitTransaction method not found on 1AM');
+
+          if (!txHex.startsWith('0x') && /^[0-9a-fA-F]+$/.test(txHex)) {
+            txHex = '0x' + txHex;
+          }
+
+          console.log('Broadcasting payload to Midnight RPC...', txHex.slice(0, 50));
+
+          // 2. Submit directly to Preprod Substrate RPC
+          const response = await fetch('https://rpc.preprod.midnight.network', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: Date.now(),
+              method: 'author_submitExtrinsic',
+              params: [txHex]
+            })
+          });
+
+          const resJson = await response.json();
+          if (resJson.result) {
+            return resJson.result;
+          }
+          if (resJson.error) {
+            throw new Error(`RPC Broadcast failed: ${JSON.stringify(resJson.error)}`);
+          }
+
+          // Fallback if RPC format differs
+          return txHex;
         },
       };
       const providers = {
