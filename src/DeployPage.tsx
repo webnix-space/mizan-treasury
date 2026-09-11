@@ -112,8 +112,8 @@ export default function DeployPage() {
       setDiag(`CPK: ${coinPk.slice(0, 24)}...`);
 
       // Official Preprod Infrastructure
-      const INDEXER_HTTP = 'https://indexer.preprod.midnight.network/api/v1/graphql';
-      const INDEXER_WS = 'wss://indexer.preprod.midnight.network/api/v1/graphql/ws';
+      const INDEXER_HTTP = 'https://indexer.preprod.midnight.network/api/v3/graphql';
+      const INDEXER_WS = 'wss://indexer.preprod.midnight.network/api/v3/graphql/ws';
       const PROOF_SERVER = 'https://api-preprod.1am.xyz';
 
       const nativeWs = typeof window !== 'undefined' ? (window.WebSocket as any) : undefined;
@@ -151,70 +151,25 @@ export default function DeployPage() {
       const midnightProvider = {
         submitTx: async (tx: any) => {
           setActiveStep('Submitting transaction to Preprod gateway...');
-          setStatus('Step 3b: Submitting via Midnight gateway...');
+          setStatus('Step 3b: Submitting via 1AM gateway...');
 
-          // Route 1: Delegate directly to publicDataProvider if available
-          if (publicDataProvider && typeof (publicDataProvider as any).submitTx === 'function') {
-            try {
-              console.log('Submitting via publicDataProvider.submitTx...');
-              const txId = await (publicDataProvider as any).submitTx(tx);
-              if (txId) return typeof txId === 'string' ? txId : (txId.txHash || txId.id || String(txId));
-            } catch (err: any) {
-              console.warn('publicDataProvider submit error, trying wallet provider:', err);
-            }
+          // Direct 1AM API submission
+          if (typeof (api as any).submitTx === 'function') {
+            const txId = await (api as any).submitTx(tx);
+            if (txId) return typeof txId === 'string' ? txId : (txId.txHash || txId.id || String(txId));
           }
 
-          // Route 2: Delegate to 1AM API connector
-          if (api && typeof (api as any).submitTx === 'function') {
-            try {
-              console.log('Submitting via 1AM api.submitTx...');
-              const res = await (api as any).submitTx(tx);
-              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || String(res));
-            } catch (err: any) {
-              console.warn('1AM api.submitTx error:', err);
-            }
+          if (typeof (api as any).submitTransaction === 'function') {
+            const txId = await (api as any).submitTransaction(tx);
+            if (txId) return typeof txId === 'string' ? txId : (txId.txHash || txId.id || String(txId));
           }
 
-          if (api && typeof (api as any).submitTransaction === 'function') {
-            try {
-              console.log('Submitting via 1AM api.submitTransaction...');
-              const res = await (api as any).submitTransaction(tx);
-              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || String(res));
-            } catch (err: any) {
-              console.warn('1AM api.submitTransaction error:', err);
-            }
+          // In case 1AM attached a midnightProvider directly
+          if ((api as any).midnightProvider && typeof (api as any).midnightProvider.submitTx === 'function') {
+            return await (api as any).midnightProvider.submitTx(tx);
           }
 
-          // Route 3: GraphQL v3 mutation on Preprod Indexer
-          try {
-            let rawBytes: Uint8Array;
-            if (tx instanceof Uint8Array) {
-              rawBytes = tx;
-            } else if (typeof tx?.serialize === 'function') {
-              rawBytes = tx.serialize();
-            } else if (tx?.bytes instanceof Uint8Array) {
-              rawBytes = tx.bytes;
-            } else {
-              rawBytes = new TextEncoder().encode(typeof tx === 'string' ? tx : JSON.stringify(tx));
-            }
-            const hexPayload = Array.from(rawBytes, (b: number) => b.toString(16).padStart(2, '0')).join('');
-            const gqlRes = await fetch('https://indexer.preprod.midnight.network/api/v3/graphql', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                query: 'mutation SubmitTx(: String!) { submitTransaction(transaction: ) }',
-                variables: { tx: hexPayload }
-              })
-            });
-            const gqlData = await gqlRes.json();
-            if (gqlData?.data?.submitTransaction) {
-              return gqlData.data.submitTransaction;
-            }
-          } catch (e) {
-            console.warn('Indexer v3 submit error:', e);
-          }
-
-          throw new Error('Transaction submission failed across all routes.');
+          throw new Error('1AM wallet did not provide a valid submitTx method.');
         },
       };
       const providers = {
