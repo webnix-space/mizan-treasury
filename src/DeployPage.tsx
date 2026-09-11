@@ -191,15 +191,39 @@ export default function DeployPage() {
             console.warn('Indexer gateway submit attempt failed:', e);
           }
 
-          // Channel 2: Delegate to 1AM directly if available
-          if (typeof api.submitTransaction === 'function') {
+          // Resilient Submit: Try submitTx, then fallback to direct Preprod RPC
+          if (typeof (api as any).submitTx === 'function') {
             try {
-              const res = await api.submitTransaction(tx);
+              const res = await (api as any).submitTx(tx);
               if (res) return typeof res === 'string' ? res : (res.txHash || res.id || JSON.stringify(res));
-            } catch (err: any) {
-              console.warn('1AM submitTransaction error:', err);
-              throw new Error(`1AM submit error: ${err.message || JSON.stringify(err)}`);
+            } catch (e) {
+              console.warn('submitTx via 1AM failed, attempting direct node broadcast:', e);
             }
+          }
+
+          if (typeof (api as any).submitTransaction === 'function') {
+            try {
+              const res = await (api as any).submitTransaction(tx);
+              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || JSON.stringify(res));
+            } catch (e) {
+              console.warn('submitTransaction failed:', e);
+            }
+          }
+
+          // Direct HTTP broadcast to Preprod RPC submitter
+          try {
+            const rawHex = Array.from(rawBytes, (b: number) => b.toString(16).padStart(2, '0')).join('');
+            const rpcRes = await fetch('https://indexer.preprod.midnight.network/submit', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tx: rawHex })
+            });
+            if (rpcRes.ok) {
+              const out = await rpcRes.json();
+              return out.txHash || out.id || 'Submitted via Preprod RPC';
+            }
+          } catch (rpcErr) {
+            console.warn('Preprod RPC submit error:', rpcErr);
           }
 
           throw new Error('All submission routes exhausted. Could not submit transaction to Preprod.');
