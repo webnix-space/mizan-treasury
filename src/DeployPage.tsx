@@ -153,33 +153,56 @@ export default function DeployPage() {
           setActiveStep('Submitting transaction to Preprod gateway...');
           setStatus('Step 3b: Submitting via Midnight gateway...');
 
-          let rawBytes: Uint8Array;
-          if (tx instanceof Uint8Array) {
-            rawBytes = tx;
-          } else if (typeof tx?.serialize === 'function') {
-            rawBytes = tx.serialize();
-          } else if (tx?.bytes instanceof Uint8Array) {
-            rawBytes = tx.bytes;
-          } else if (tx?.raw instanceof Uint8Array) {
-            rawBytes = tx.raw;
-          } else {
-            rawBytes = new TextEncoder().encode(typeof tx === 'string' ? tx : JSON.stringify(tx));
+          // Route 1: Delegate directly to publicDataProvider if available
+          if (publicDataProvider && typeof (publicDataProvider as any).submitTx === 'function') {
+            try {
+              console.log('Submitting via publicDataProvider.submitTx...');
+              const txId = await (publicDataProvider as any).submitTx(tx);
+              if (txId) return typeof txId === 'string' ? txId : (txId.txHash || txId.id || String(txId));
+            } catch (err: any) {
+              console.warn('publicDataProvider submit error, trying wallet provider:', err);
+            }
           }
 
-          // Channel 1: Midnight Preprod Indexer / Tx submission service
+          // Route 2: Delegate to 1AM API connector
+          if (api && typeof (api as any).submitTx === 'function') {
+            try {
+              console.log('Submitting via 1AM api.submitTx...');
+              const res = await (api as any).submitTx(tx);
+              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || String(res));
+            } catch (err: any) {
+              console.warn('1AM api.submitTx error:', err);
+            }
+          }
+
+          if (api && typeof (api as any).submitTransaction === 'function') {
+            try {
+              console.log('Submitting via 1AM api.submitTransaction...');
+              const res = await (api as any).submitTransaction(tx);
+              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || String(res));
+            } catch (err: any) {
+              console.warn('1AM api.submitTransaction error:', err);
+            }
+          }
+
+          // Route 3: GraphQL v3 mutation on Preprod Indexer
           try {
-            const indexerEndpoints = [
-              'https://indexer.preprod.midnight.network/api/v1/graphql',
-              'https://indexer.preprod.midnight.network/submit'
-            ];
-            
-            // Try standard GraphQL mutation if supported
-            const hexPayload = Array.from(rawBytes, b => b.toString(16).padStart(2, '0')).join('');
-            const gqlRes = await fetch('https://indexer.preprod.midnight.network/api/v1/graphql', {
+            let rawBytes: Uint8Array;
+            if (tx instanceof Uint8Array) {
+              rawBytes = tx;
+            } else if (typeof tx?.serialize === 'function') {
+              rawBytes = tx.serialize();
+            } else if (tx?.bytes instanceof Uint8Array) {
+              rawBytes = tx.bytes;
+            } else {
+              rawBytes = new TextEncoder().encode(typeof tx === 'string' ? tx : JSON.stringify(tx));
+            }
+            const hexPayload = Array.from(rawBytes, (b: number) => b.toString(16).padStart(2, '0')).join('');
+            const gqlRes = await fetch('https://indexer.preprod.midnight.network/api/v3/graphql', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                query: `mutation SubmitTx($tx: String!) { submitTransaction(transaction: $tx) }`,
+                query: 'mutation SubmitTx(: String!) { submitTransaction(transaction: ) }',
                 variables: { tx: hexPayload }
               })
             });
@@ -188,45 +211,10 @@ export default function DeployPage() {
               return gqlData.data.submitTransaction;
             }
           } catch (e) {
-            console.warn('Indexer gateway submit attempt failed:', e);
+            console.warn('Indexer v3 submit error:', e);
           }
 
-          // Resilient Submit: Try submitTx, then fallback to direct Preprod RPC
-          if (typeof (api as any).submitTx === 'function') {
-            try {
-              const res = await (api as any).submitTx(tx);
-              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || JSON.stringify(res));
-            } catch (e) {
-              console.warn('submitTx via 1AM failed, attempting direct node broadcast:', e);
-            }
-          }
-
-          if (typeof (api as any).submitTransaction === 'function') {
-            try {
-              const res = await (api as any).submitTransaction(tx);
-              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || JSON.stringify(res));
-            } catch (e) {
-              console.warn('submitTransaction failed:', e);
-            }
-          }
-
-          // Direct HTTP broadcast to Preprod RPC submitter
-          try {
-            const rawHex = Array.from(rawBytes, (b: number) => b.toString(16).padStart(2, '0')).join('');
-            const rpcRes = await fetch('https://indexer.preprod.midnight.network/submit', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tx: rawHex })
-            });
-            if (rpcRes.ok) {
-              const out = await rpcRes.json();
-              return out.txHash || out.id || 'Submitted via Preprod RPC';
-            }
-          } catch (rpcErr) {
-            console.warn('Preprod RPC submit error:', rpcErr);
-          }
-
-          throw new Error('All submission routes exhausted. Could not submit transaction to Preprod.');
+          throw new Error('Transaction submission failed across all routes.');
         },
       };
       const providers = {
