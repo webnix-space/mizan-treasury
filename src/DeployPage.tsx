@@ -150,26 +150,79 @@ export default function DeployPage() {
       };
       const midnightProvider = {
         submitTx: async (tx: any) => {
-          setActiveStep('Submitting transaction to Preprod gateway...');
-          setStatus('Step 3b: Submitting via 1AM gateway...');
+          setActiveStep('Broadcasting transaction to Preprod node...');
+          setStatus('Step 3b: Submitting transaction directly to Preprod...');
 
-          // Direct 1AM API submission
+          // 1. Serialize the transaction object to binary / hex
+          let bytes: Uint8Array;
+          if (tx instanceof Uint8Array) {
+            bytes = tx;
+          } else if (typeof tx?.serialize === 'function') {
+            bytes = tx.serialize();
+          } else if (tx?.bytes instanceof Uint8Array) {
+            bytes = tx.bytes;
+          } else if (typeof tx?.toBytes === 'function') {
+            bytes = tx.toBytes();
+          } else {
+            bytes = new TextEncoder().encode(typeof tx === 'string' ? tx : JSON.stringify(tx));
+          }
+
+          const hexTx = Array.from(bytes, (b: number) => b.toString(16).padStart(2, '0')).join('');
+
+          // 2. Submit directly to Midnight Preprod RPC endpoints (bypasses 1AM extension completely)
+          const submitEndpoints = [
+            'https://rpc.preprod.midnight.network',
+            'https://indexer.preprod.midnight.network/api/v3/graphql',
+            'https://preprod.midnight.network/api/v1/tx'
+          ];
+
+          // Try RPC JSON-RPC submit first
+          try {
+            const rpcRes = await fetch('https://rpc.preprod.midnight.network', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'submitTx',
+                params: [hexTx]
+              })
+            });
+            const rpcData = await rpcRes.json();
+            if (rpcData?.result) return String(rpcData.result);
+          } catch (e) {
+            console.warn('Direct RPC submit failed, trying fallback indexer mutation:', e);
+          }
+
+          // Try GraphQL mutation fallback
+          try {
+            const gqlRes = await fetch('https://indexer.preprod.midnight.network/api/v3/graphql', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                query: 'mutation SubmitTx($tx: String!) { submitTransaction(transaction: $tx) }',
+                variables: { tx: hexTx }
+              })
+            });
+            const gqlData = await gqlRes.json();
+            if (gqlData?.data?.submitTransaction) {
+              return String(gqlData.data.submitTransaction);
+            }
+          } catch (e) {
+            console.warn('Indexer mutation failed:', e);
+          }
+
+          // Fallback: If 1AM has a non-interactive background submit
           if (typeof (api as any).submitTx === 'function') {
-            const txId = await (api as any).submitTx(tx);
-            if (txId) return typeof txId === 'string' ? txId : (txId.txHash || txId.id || String(txId));
+            try {
+              const res = await (api as any).submitTx(tx);
+              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || String(res));
+            } catch (err) {
+              console.warn('1AM submitTx failed:', err);
+            }
           }
 
-          if (typeof (api as any).submitTransaction === 'function') {
-            const txId = await (api as any).submitTransaction(tx);
-            if (txId) return typeof txId === 'string' ? txId : (txId.txHash || txId.id || String(txId));
-          }
-
-          // In case 1AM attached a midnightProvider directly
-          if ((api as any).midnightProvider && typeof (api as any).midnightProvider.submitTx === 'function') {
-            return await (api as any).midnightProvider.submitTx(tx);
-          }
-
-          throw new Error('1AM wallet did not provide a valid submitTx method.');
+          throw new Error('Preprod node submission failed. Ensure network connectivity to preprod.midnight.network.');
         },
       };
       const providers = {
