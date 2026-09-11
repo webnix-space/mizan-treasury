@@ -238,7 +238,7 @@ export default function DeployPage() {
 
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
-        args: [ownerBytes, initialBalance],
+        args: [],
         privateStateKey: 'treasuryVaultPrivateState',
         initialPrivateState: {},
       });
