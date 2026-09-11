@@ -120,7 +120,7 @@ export default function DeployPage() {
       
       // Use 1AM's native public provider if attached, otherwise our indexer
       const publicDataProvider = api.publicDataProvider || indexerPublicDataProvider(INDEXER_HTTP, INDEXER_WS, nativeWs);
-      const proofProvider = httpClientProofProvider(PROOF_SERVER);
+      const proofProvider = httpClientProofProvider('https://26f42cf1466035.lhr.life');
 
       const walletProvider = {
         coinPublicKey: coinPk,
@@ -209,7 +209,17 @@ export default function DeployPage() {
         privateStateProvider: inMemoryPrivateStateProvider(),
         publicDataProvider,
         zkConfigProvider: {
-          getZkConfig: async () => ({ proverKey: async () => new Uint8Array(), verifierKey: async () => new Uint8Array() }),
+          getZkConfig: async (circuitId: string) => {
+            const baseUrl = window.location.origin + '/TreasuryVault';
+            const [proverRes, verifierRes] = await Promise.all([
+              fetch(`${baseUrl}/${circuitId}.prover`),
+              fetch(`${baseUrl}/${circuitId}.verifier`)
+            ]);
+            return {
+              proverKey: async () => new Uint8Array(await proverRes.arrayBuffer()),
+              verifierKey: async () => new Uint8Array(await verifierRes.arrayBuffer()),
+            };
+          }
         },
         proofProvider,
         walletProvider,
@@ -222,9 +232,13 @@ export default function DeployPage() {
       setActiveStep('deployContract executing...');
       setStatus('Step 3: Generating circuit proof & submitting contract...');
 
+      const ownerBytes = new Uint8Array(32);
+      window.crypto.getRandomValues(ownerBytes);
+      const initialBalance = 1_000_000n;
+
       const deployed = await deployContract(providers as any, {
         compiledContract: compiledContract as any,
-        args: [],
+        args: [ownerBytes, initialBalance],
         privateStateKey: 'treasuryVaultPrivateState',
         initialPrivateState: {},
       });

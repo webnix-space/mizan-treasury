@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "file": "index.js",
+  "sourceRoot": "../../../../",
+  "sources": ["contracts/TreasuryVault.compact"],
+  "names": [],
+  "mappings": ";;;;;;;;;;;EAAA;;;;;;;;;;;;;GAkCC;EAlCD;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;GAkCC;;;;;;;;;;;;;;;;;;;;;;;;;"
+}
