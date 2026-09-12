@@ -187,10 +187,23 @@ export default function DeployPage() {
       const providers = {
         privateStateProvider: {
           ...inMemoryPrivateStateProvider(),
-          setContractAddress: (address: string) => {
-            console.log('[PrivateStateProvider] Contract address set:', address);
-            return Promise.resolve();
+          setContractAddress: async (address: string) => {
+            console.log('[PrivateStateProvider] Contract address:', address);
           },
+          getSigningKey: async (contractAddress: string) => {
+            console.log('[PrivateStateProvider] getSigningKey for:', contractAddress);
+            return null;
+          },
+          setSigningKey: async (contractAddress: string, key: any) => {
+            console.log('[PrivateStateProvider] setSigningKey for:', contractAddress);
+          },
+          removeSigningKey: async (contractAddress: string) => {
+            console.log('[PrivateStateProvider] removeSigningKey for:', contractAddress);
+          },
+          clearSigningKeys: async () => {
+            console.log('[PrivateStateProvider] clearSigningKeys called');
+          },
+        },
         },
         publicDataProvider,
         zkConfigProvider: {
