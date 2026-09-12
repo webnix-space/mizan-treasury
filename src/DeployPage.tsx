@@ -137,42 +137,32 @@ export default function DeployPage() {
       const publicDataProvider = api.publicDataProvider || indexerPublicDataProvider(INDEXER_HTTP, INDEXER_WS, nativeWs);
       const proofProvider = httpClientProofProvider(PROOF_SERVER);
 
+      const shieldedInfo = await (api as any).getShieldedAddresses();
+      const shieldedCpk = shieldedInfo?.shieldedCoinPublicKey || coinPk;
+      const shieldedEpk = shieldedInfo?.shieldedEncryptionPublicKey || encPk;
+
       const walletProvider = {
-        coinPublicKey: coinPk,
-        encryptionPublicKey: encPk,
-        getCoinPublicKey: () => coinPk,
-        getEncryptionPublicKey: () => encPk,
-        balanceTx: async (tx: any, newCoins?: any) => {
+        getCoinPublicKey: () => shieldedCpk,
+        getEncryptionPublicKey: () => shieldedEpk,
+        balanceTx: async (tx: any) => {
           setActiveStep('Balancing transaction with 1AM...');
-          setStatus('Step 3a: Balancing transaction with 1AM...');
-          console.log('[1AM] Attempting balanceUnsealedTransaction...');
+          setStatus('Step 3a: 1AM ProofStation is balancing transaction and sponsoring gas...');
+          console.log('[1AM] Serializing tx to hex for balanceUnsealedTransaction...');
 
-          // 1AM native balance methods
-          if (typeof (api as any).balanceUnsealedTransaction === 'function') {
-            try {
-              const res = await (api as any).balanceUnsealedTransaction(tx, newCoins);
-              if (res) {
-                console.log('[1AM] balanceUnsealedTransaction succeeded:', res);
-                return res;
-              }
-            } catch (err: any) {
-              console.warn('[1AM] balanceUnsealedTransaction error:', err?.message || err);
-            }
+          const serialized = typeof tx.serialize === 'function' ? tx.serialize() : tx;
+          const hex = Array.from(serialized instanceof Uint8Array ? serialized : new Uint8Array(serialized))
+            .map((b: any) => b.toString(16).padStart(2, '0'))
+            .join('');
+
+          const result = await (api as any).balanceUnsealedTransaction(hex);
+          if (!result || !result.tx) {
+            throw new Error('1AM balanceUnsealedTransaction returned empty transaction response.');
           }
 
-          if (typeof (api as any).balanceSealedTransaction === 'function') {
-            try {
-              const res = await (api as any).balanceSealedTransaction(tx);
-              if (res) {
-                console.log('[1AM] balanceSealedTransaction succeeded:', res);
-                return res;
-              }
-            } catch (err: any) {
-              console.warn('[1AM] balanceSealedTransaction error:', err?.message || err);
-            }
-          }
-
-          throw new Error('1AM failed to balance transaction. Ensure 1AM has sufficient unshielded NIGHT and DUST.');
+          console.log('[1AM] Received balanced tx hex from 1AM, deserializing...');
+          const { Transaction } = await import('@midnight-ntwrk/ledger-v8');
+          const bytes = new Uint8Array(result.tx.match(/.{2}/g).map((b: string) => parseInt(b, 16)));
+          return Transaction.deserialize('signature', 'proof', 'binding', bytes);
         },
       };
 
@@ -180,18 +170,18 @@ export default function DeployPage() {
         submitTx: async (tx: any) => {
           setActiveStep('Broadcasting transaction...');
           setStatus('Step 3b: Broadcasting transaction via 1AM...');
-          console.log('[1AM] Submitting balanced transaction to submitTransaction...');
+          console.log('[1AM] Serializing balanced tx to hex for submitTransaction...');
 
-          if (typeof (api as any).submitTransaction === 'function') {
-            const txId = await (api as any).submitTransaction(tx);
-            if (txId) {
-              const hash = typeof txId === 'string' ? txId : (txId.txHash || txId.id || JSON.stringify(txId));
-              console.log('[1AM] Transaction submitted successfully! Hash:', hash);
-              return hash;
-            }
-          }
+          const serialized = typeof tx.serialize === 'function' ? tx.serialize() : tx;
+          const hex = Array.from(serialized instanceof Uint8Array ? serialized : new Uint8Array(serialized))
+            .map((b: any) => b.toString(16).padStart(2, '0'))
+            .join('');
 
-          throw new Error('1AM submitTransaction failed or returned empty hash.');
+          await (api as any).submitTransaction(hex);
+
+          const txId = typeof tx.identifiers === 'function' ? tx.identifiers()[0] : (tx.id || hex.slice(0, 32));
+          console.log('[1AM] Transaction successfully broadcasted! Tx ID:', txId);
+          return String(txId);
         },
       };
       const providers = {
