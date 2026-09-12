@@ -147,6 +147,18 @@ export default function DeployPage() {
           }
           return tx;
         },
+        signTx: async (tx: any) => {
+          setActiveStep('Awaiting signature in 1AM...');
+          setStatus('Step 3a.2: Please confirm and sign the transaction in 1AM wallet...');
+          console.log('[1AM] Triggering interactive signTx...');
+          if (typeof (api as any).signTx === 'function') {
+            return await (api as any).signTx(tx);
+          }
+          if (typeof (api as any).signTransaction === 'function') {
+            return await (api as any).signTransaction(tx);
+          }
+          return tx;
+        },
       };
       const midnightProvider = {
         submitTx: async (tx: any) => {
