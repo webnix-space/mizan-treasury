@@ -143,33 +143,29 @@ export default function DeployPage() {
         balanceTx: async (tx: any, newCoins?: any) => {
           setActiveStep('Balancing transaction with 1AM...');
           setStatus('Step 3a: Balancing transaction...');
-          console.log('[1AM] Requesting balanceTx...');
-          if (typeof api.balanceTx === 'function') {
+          console.log('[1AM] Calling balanceTx with unshielded context...');
+          if (typeof (api as any).balanceTx === 'function') {
             try {
-              const res = await api.balanceTx(tx, newCoins);
+              const res = await (api as any).balanceTx(tx, newCoins);
               if (res) return res;
-            } catch (e) { console.warn('balanceTx error, trying unsealed:', e); }
+            } catch (e: any) {
+              console.warn('[1AM] balanceTx error:', e?.message || e);
+            }
           }
-          if (typeof api.balanceUnsealedTransaction === 'function') {
+          if (typeof (api as any).balanceUnsealedTransaction === 'function') {
             try {
-              const res = await api.balanceUnsealedTransaction(tx, newCoins);
+              const res = await (api as any).balanceUnsealedTransaction(tx, newCoins);
               if (res) return res;
-            } catch (e) { console.warn('balanceUnsealedTransaction error:', e); }
-          }
-          if (typeof api.balanceSealedTransaction === 'function') {
-            try {
-              const res = await api.balanceSealedTransaction(tx);
-              if (res) return res;
-            } catch (e) { console.warn('balanceSealedTransaction error:', e); }
-          }
-            try { return await api.balanceTx(tx); } catch (_) {}
+            } catch (e: any) {
+              console.warn('[1AM] balanceUnsealedTransaction error:', e?.message || e);
+            }
           }
           return tx;
         },
         signTx: async (tx: any) => {
           setActiveStep('Awaiting signature in 1AM...');
           setStatus('Step 3a.2: Please confirm and sign the transaction in 1AM wallet...');
-          console.log('[1AM] Triggering interactive signTx...');
+          console.log('[1AM] Requesting signTx...');
           if (typeof (api as any).signTx === 'function') {
             return await (api as any).signTx(tx);
           }
@@ -179,81 +175,43 @@ export default function DeployPage() {
           return tx;
         },
       };
+
       const midnightProvider = {
         submitTx: async (tx: any) => {
-          setActiveStep('Broadcasting transaction to Preprod node...');
-          setStatus('Step 3b: Submitting transaction directly to Preprod...');
+          setActiveStep('Broadcasting transaction...');
+          setStatus('Step 3b: Broadcasting transaction via 1AM / Preprod Indexer...');
 
-          // 1. Serialize the transaction object to binary / hex
-          let bytes: Uint8Array;
-          if (tx instanceof Uint8Array) {
-            bytes = tx;
-          } else if (typeof tx?.serialize === 'function') {
-            bytes = tx.serialize();
-          } else if (tx?.bytes instanceof Uint8Array) {
-            bytes = tx.bytes;
-          } else if (typeof tx?.toBytes === 'function') {
-            bytes = tx.toBytes();
-          } else {
-            bytes = new TextEncoder().encode(typeof tx === 'string' ? tx : JSON.stringify(tx));
-          }
-
-          const hexTx = Array.from(bytes, (b: number) => b.toString(16).padStart(2, '0')).join('');
-
-          // 2. Submit directly to Midnight Preprod RPC endpoints (bypasses 1AM extension completely)
-          const submitEndpoints = [
-            'https://rpc.preprod.midnight.network',
-            'https://indexer.preprod.midnight.network/api/v3/graphql',
-            'https://preprod.midnight.network/api/v1/tx'
-          ];
-
-          // Try RPC JSON-RPC submit first
-          try {
-            const rpcRes = await fetch('https://rpc.preprod.midnight.network', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: 1,
-                method: 'submitTx',
-                params: [hexTx]
-              })
-            });
-            const rpcData = await rpcRes.json();
-            if (rpcData?.result) return String(rpcData.result);
-          } catch (e) {
-            console.warn('Direct RPC submit failed, trying fallback indexer mutation:', e);
-          }
-
-          // Try GraphQL mutation fallback
-          try {
-            const gqlRes = await fetch('https://indexer.preprod.midnight.network/api/v3/graphql', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                query: 'mutation SubmitTx($tx: String!) { submitTransaction(transaction: $tx) }',
-                variables: { tx: hexTx }
-              })
-            });
-            const gqlData = await gqlRes.json();
-            if (gqlData?.data?.submitTransaction) {
-              return String(gqlData.data.submitTransaction);
-            }
-          } catch (e) {
-            console.warn('Indexer mutation failed:', e);
-          }
-
-          // Fallback: If 1AM has a non-interactive background submit
+          // 1. Delegate directly to 1AM API (now that signTx has completed)
           if (typeof (api as any).submitTx === 'function') {
             try {
               const res = await (api as any).submitTx(tx);
               if (res) return typeof res === 'string' ? res : (res.txHash || res.id || String(res));
-            } catch (err) {
-              console.warn('1AM submitTx failed:', err);
+            } catch (err: any) {
+              console.warn('1AM submitTx error:', err);
+              throw new Error(`1AM submitTx rejected: ${err.message || JSON.stringify(err)}`);
             }
           }
 
-          throw new Error('Preprod node submission failed. Ensure network connectivity to preprod.midnight.network.');
+          if (typeof (api as any).submitTransaction === 'function') {
+            try {
+              const res = await (api as any).submitTransaction(tx);
+              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || String(res));
+            } catch (err: any) {
+              console.warn('1AM submitTransaction error:', err);
+              throw new Error(`1AM submitTransaction rejected: ${err.message || JSON.stringify(err)}`);
+            }
+          }
+
+          // 2. Fallback to publicDataProvider if attached
+          if (publicDataProvider && typeof (publicDataProvider as any).submitTx === 'function') {
+            try {
+              return await (publicDataProvider as any).submitTx(tx);
+            } catch (err: any) {
+              throw new Error(`publicDataProvider submit error: ${err.message || JSON.stringify(err)}`);
+            }
+          }
+
+          throw new Error('No valid submission channel found on 1AM connector.');
         },
       };
       const providers = {
