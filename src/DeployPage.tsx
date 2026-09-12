@@ -122,7 +122,9 @@ export default function DeployPage() {
         : (typeof api.getUnshieldedAddress === 'function' ? await api.getUnshieldedAddress() : null);
       const unshieldedAddr = extractString(unshieldedRaw);
 
-      setDiag(`Unshielded: ${unshieldedAddr ? unshieldedAddr.slice(0, 15) + '...' : 'detected'}`);
+      const apiMethods = Object.keys(api).filter(k => typeof (api as any)[k] === 'function').join(', ');
+      setDiag(`Methods: ${apiMethods}`);
+      console.log('1AM API methods:', Object.keys(api));
 
       // Official Preprod Infrastructure
       const INDEXER_HTTP = 'https://indexer.preprod.midnight.network/api/v3/graphql';
