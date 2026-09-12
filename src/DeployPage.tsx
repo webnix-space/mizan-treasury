@@ -95,21 +95,34 @@ export default function DeployPage() {
 
       const api = typeof entry.connect === 'function' ? await entry.connect() : (typeof entry.enable === 'function' ? await entry.enable() : entry);
 
-      setActiveStep('Reading addresses...');
-      setStatus('Step 2: Deriving keys from shielded address...');
+      setActiveStep('Reading wallet addresses and keys...');
+      setStatus('Step 2: Reading wallet public credentials...');
+
+      let coinPk = '';
+      let encPk = '';
+
+      if (typeof api.getCoinPublicKey === 'function') {
+        try { coinPk = await api.getCoinPublicKey(); } catch (_) {}
+      }
+      if (typeof api.getEncryptionPublicKey === 'function') {
+        try { encPk = await api.getEncryptionPublicKey(); } catch (_) {}
+      }
 
       const shieldedRaw = typeof api.getShieldedAddresses === 'function' ? await api.getShieldedAddresses() : null;
       const shieldedAddr = extractString(shieldedRaw);
 
-      if (!shieldedAddr) {
-        throw new Error('Could not retrieve shielded address from 1AM.');
+      if (shieldedAddr && (!coinPk || !encPk)) {
+        const derived = deriveKeysFromShieldedAddress(shieldedAddr);
+        coinPk = coinPk || derived.cpk;
+        encPk = encPk || derived.epk;
       }
 
-      const derived = deriveKeysFromShieldedAddress(shieldedAddr);
-      const coinPk = derived.cpk;
-      const encPk = derived.epk;
+      const unshieldedRaw = typeof api.getUnshieldedAddresses === 'function'
+        ? await api.getUnshieldedAddresses()
+        : (typeof api.getUnshieldedAddress === 'function' ? await api.getUnshieldedAddress() : null);
+      const unshieldedAddr = extractString(unshieldedRaw);
 
-      setDiag(`CPK: ${coinPk.slice(0, 24)}...`);
+      setDiag(`Unshielded: ${unshieldedAddr ? unshieldedAddr.slice(0, 15) + '...' : 'detected'}`);
 
       // Official Preprod Infrastructure
       const INDEXER_HTTP = 'https://indexer.preprod.midnight.network/api/v3/graphql';
@@ -127,12 +140,19 @@ export default function DeployPage() {
         encryptionPublicKey: encPk,
         getCoinPublicKey: () => coinPk,
         getEncryptionPublicKey: () => encPk,
-        balanceTx: async (tx: any) => {
+        balanceTx: async (tx: any, newCoins?: any) => {
           setActiveStep('Balancing transaction with 1AM...');
           setStatus('Step 3a: Balancing transaction...');
+          console.log('[1AM] Requesting balanceTx...');
+          if (typeof api.balanceTx === 'function') {
+            try {
+              const res = await api.balanceTx(tx, newCoins);
+              if (res) return res;
+            } catch (e) { console.warn('balanceTx error, trying unsealed:', e); }
+          }
           if (typeof api.balanceUnsealedTransaction === 'function') {
             try {
-              const res = await api.balanceUnsealedTransaction(tx);
+              const res = await api.balanceUnsealedTransaction(tx, newCoins);
               if (res) return res;
             } catch (e) { console.warn('balanceUnsealedTransaction error:', e); }
           }
@@ -142,7 +162,6 @@ export default function DeployPage() {
               if (res) return res;
             } catch (e) { console.warn('balanceSealedTransaction error:', e); }
           }
-          if (typeof api.balanceTx === 'function') {
             try { return await api.balanceTx(tx); } catch (_) {}
           }
           return tx;
