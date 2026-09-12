@@ -429,6 +429,52 @@ export default function DeployPage() {
           {txHash && <p style={{ fontSize: '0.85rem', wordBreak: 'break-all', margin: 0 }}>Tx: {txHash}</p>}
         </div>
       )}
+
+      <div style={{ marginTop: '2rem', padding: '1.25rem', border: '1px solid #334155', borderRadius: '8px', background: '#0f172a' }}>
+        <h2 style={{ fontSize: '1.15rem', marginBottom: '0.75rem', color: '#60a5fa' }}>Vault Interaction: deposit()</h2>
+        <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '1rem' }}>
+          Target: <code style={{ color: '#34d399' }}>{contractAddress || '2dd4b32e809cc8ed9964b19cba2b6af45b0d572106218b86eeb8956aa782295c'}</code>
+        </p>
+
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <input
+            type="number"
+            value={depositAmount}
+            onChange={(e) => setDepositAmount(e.target.value)}
+            placeholder="Amount"
+            style={{
+              padding: '0.65rem 0.85rem',
+              background: '#1e293b',
+              border: '1px solid #475569',
+              color: '#fff',
+              borderRadius: '6px',
+              flex: 1,
+              outline: 'none'
+            }}
+          />
+          <button
+            onClick={handleDeposit}
+            disabled={callingCircuit}
+            style={{
+              padding: '0.65rem 1.25rem',
+              backgroundColor: callingCircuit ? '#475569' : '#0284c7',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              fontWeight: 'bold',
+              cursor: callingCircuit ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {callingCircuit ? 'Proving...' : 'Deposit'}
+          </button>
+        </div>
+
+        {circuitTxHash && (
+          <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#064e3b', borderRadius: '6px', wordBreak: 'break-all', fontSize: '0.85rem' }}>
+            ✓ Deposit Submitted! Tx: {circuitTxHash}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
