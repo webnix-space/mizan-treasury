@@ -185,7 +185,13 @@ export default function DeployPage() {
         },
       };
       const providers = {
-        privateStateProvider: inMemoryPrivateStateProvider(),
+        privateStateProvider: {
+          ...inMemoryPrivateStateProvider(),
+          setContractAddress: (address: string) => {
+            console.log('[PrivateStateProvider] Contract address set:', address);
+            return Promise.resolve();
+          },
+        },
         publicDataProvider,
         zkConfigProvider: {
           getZkConfig: async (circuitId: string) => {
