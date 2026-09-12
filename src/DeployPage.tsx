@@ -144,76 +144,54 @@ export default function DeployPage() {
         getEncryptionPublicKey: () => encPk,
         balanceTx: async (tx: any, newCoins?: any) => {
           setActiveStep('Balancing transaction with 1AM...');
-          setStatus('Step 3a: Balancing transaction...');
-          console.log('[1AM] Calling balanceTx with unshielded context...');
-          if (typeof (api as any).balanceTx === 'function') {
-            try {
-              const res = await (api as any).balanceTx(tx, newCoins);
-              if (res) return res;
-            } catch (e: any) {
-              console.warn('[1AM] balanceTx error:', e?.message || e);
-            }
-          }
+          setStatus('Step 3a: Balancing transaction with 1AM...');
+          console.log('[1AM] Attempting balanceUnsealedTransaction...');
+
+          // 1AM native balance methods
           if (typeof (api as any).balanceUnsealedTransaction === 'function') {
             try {
               const res = await (api as any).balanceUnsealedTransaction(tx, newCoins);
-              if (res) return res;
-            } catch (e: any) {
-              console.warn('[1AM] balanceUnsealedTransaction error:', e?.message || e);
+              if (res) {
+                console.log('[1AM] balanceUnsealedTransaction succeeded:', res);
+                return res;
+              }
+            } catch (err: any) {
+              console.warn('[1AM] balanceUnsealedTransaction error:', err?.message || err);
             }
           }
-          return tx;
-        },
-        signTx: async (tx: any) => {
-          setActiveStep('Awaiting signature in 1AM...');
-          setStatus('Step 3a.2: Please confirm and sign the transaction in 1AM wallet...');
-          console.log('[1AM] Requesting signTx...');
-          if (typeof (api as any).signTx === 'function') {
-            return await (api as any).signTx(tx);
+
+          if (typeof (api as any).balanceSealedTransaction === 'function') {
+            try {
+              const res = await (api as any).balanceSealedTransaction(tx);
+              if (res) {
+                console.log('[1AM] balanceSealedTransaction succeeded:', res);
+                return res;
+              }
+            } catch (err: any) {
+              console.warn('[1AM] balanceSealedTransaction error:', err?.message || err);
+            }
           }
-          if (typeof (api as any).signTransaction === 'function') {
-            return await (api as any).signTransaction(tx);
-          }
-          return tx;
+
+          throw new Error('1AM failed to balance transaction. Ensure 1AM has sufficient unshielded NIGHT and DUST.');
         },
       };
 
       const midnightProvider = {
         submitTx: async (tx: any) => {
           setActiveStep('Broadcasting transaction...');
-          setStatus('Step 3b: Broadcasting transaction via 1AM / Preprod Indexer...');
-
-          // 1. Delegate directly to 1AM API (now that signTx has completed)
-          if (typeof (api as any).submitTx === 'function') {
-            try {
-              const res = await (api as any).submitTx(tx);
-              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || String(res));
-            } catch (err: any) {
-              console.warn('1AM submitTx error:', err);
-              throw new Error(`1AM submitTx rejected: ${err.message || JSON.stringify(err)}`);
-            }
-          }
+          setStatus('Step 3b: Broadcasting transaction via 1AM...');
+          console.log('[1AM] Submitting balanced transaction to submitTransaction...');
 
           if (typeof (api as any).submitTransaction === 'function') {
-            try {
-              const res = await (api as any).submitTransaction(tx);
-              if (res) return typeof res === 'string' ? res : (res.txHash || res.id || String(res));
-            } catch (err: any) {
-              console.warn('1AM submitTransaction error:', err);
-              throw new Error(`1AM submitTransaction rejected: ${err.message || JSON.stringify(err)}`);
+            const txId = await (api as any).submitTransaction(tx);
+            if (txId) {
+              const hash = typeof txId === 'string' ? txId : (txId.txHash || txId.id || JSON.stringify(txId));
+              console.log('[1AM] Transaction submitted successfully! Hash:', hash);
+              return hash;
             }
           }
 
-          // 2. Fallback to publicDataProvider if attached
-          if (publicDataProvider && typeof (publicDataProvider as any).submitTx === 'function') {
-            try {
-              return await (publicDataProvider as any).submitTx(tx);
-            } catch (err: any) {
-              throw new Error(`publicDataProvider submit error: ${err.message || JSON.stringify(err)}`);
-            }
-          }
-
-          throw new Error('No valid submission channel found on 1AM connector.');
+          throw new Error('1AM submitTransaction failed or returned empty hash.');
         },
       };
       const providers = {
