@@ -133,7 +133,7 @@ export default function DeployPage() {
       
       // Use 1AM's native public provider if attached, otherwise our indexer
       const publicDataProvider = api.publicDataProvider || indexerPublicDataProvider(INDEXER_HTTP, INDEXER_WS, nativeWs);
-      const proofProvider = httpClientProofProvider('https://26f42cf1466035.lhr.life');
+      const proofProvider = httpClientProofProvider(PROOF_SERVER);
 
       const walletProvider = {
         coinPublicKey: coinPk,
