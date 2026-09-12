@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
-import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
+import { deployContract, submitCallTx } from '@midnight-ntwrk/midnight-js-contracts';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
@@ -62,6 +62,113 @@ export default function DeployPage() {
   const [selectedWallet, setSelectedWallet] = useState<string>('');
   const [contractAddress, setContractAddress] = useState<string>('');
   const [txHash, setTxHash] = useState<string>('');
+  const [depositAmount, setDepositAmount] = useState<string>('1000');
+  const [callingCircuit, setCallingCircuit] = useState<boolean>(false);
+  const [circuitTxHash, setCircuitTxHash] = useState<string>('');
+
+  const handleDeposit = async () => {
+    if (!contractAddress && !deployedContractFallback) {
+      alert('No contract address found');
+      return;
+    }
+    const targetAddress = contractAddress || 'cfa163a00c4712399a4b673ec5233bfe8128cbd7b320f8ced3a771491adf8ddf';
+    setCallingCircuit(true);
+    setStatus('Preparing deposit circuit transaction...');
+    try {
+      const midnightObj = (window as any).midnight;
+      const api = await midnightObj['1am'].connect('preprod');
+
+      const shieldedInfo = await (api as any).getShieldedAddresses();
+      const shieldedCpk = shieldedInfo?.shieldedCoinPublicKey;
+      const shieldedEpk = shieldedInfo?.shieldedEncryptionPublicKey;
+
+      const walletProvider = {
+        getCoinPublicKey: () => shieldedCpk,
+        getEncryptionPublicKey: () => shieldedEpk,
+        balanceTx: async (tx: any) => {
+          setStatus('Balancing deposit transaction with 1AM...');
+          const serialized = typeof tx.serialize === 'function' ? tx.serialize() : tx;
+          const hex = Array.from(serialized instanceof Uint8Array ? serialized : new Uint8Array(serialized))
+            .map((b: any) => b.toString(16).padStart(2, '0'))
+            .join('');
+          const result = await (api as any).balanceUnsealedTransaction(hex);
+          const { Transaction } = await import('@midnight-ntwrk/ledger-v8');
+          const bytes = new Uint8Array(result.tx.match(/.{2}/g).map((b: string) => parseInt(b, 16)));
+          return Transaction.deserialize('signature', 'proof', 'binding', bytes);
+        },
+      };
+
+      const midnightProvider = {
+        submitTx: async (tx: any) => {
+          setStatus('Broadcasting deposit transaction...');
+          const serialized = typeof tx.serialize === 'function' ? tx.serialize() : tx;
+          const hex = Array.from(serialized instanceof Uint8Array ? serialized : new Uint8Array(serialized))
+            .map((b: any) => b.toString(16).padStart(2, '0'))
+            .join('');
+          await (api as any).submitTransaction(hex);
+          const txId = typeof tx.identifiers === 'function' ? tx.identifiers()[0] : (tx.id || hex.slice(0, 32));
+          return String(txId);
+        },
+      };
+
+      const publicDataProvider = indexerPublicDataProvider(
+        'https://indexer.preprod.midnight.network/api/v3/graphql',
+        'wss://indexer.preprod.midnight.network/api/v3/graphql/ws',
+        typeof window !== 'undefined' ? (window.WebSocket as any) : undefined
+      );
+
+      const proofProvider = httpClientProofProvider('https://api-preprod.1am.xyz');
+
+      const providers = {
+        privateStateProvider: {
+          ...inMemoryPrivateStateProvider(),
+          setContractAddress: async () => {},
+          getSigningKey: async () => null,
+          setSigningKey: async () => {},
+          removeSigningKey: async () => {},
+          clearSigningKeys: async () => {},
+        },
+        publicDataProvider,
+        zkConfigProvider: {
+          getZkConfig: async (circuitId: string) => {
+            const baseUrl = window.location.origin + '/TreasuryVault';
+            const [proverRes, verifierRes] = await Promise.all([
+              fetch(`${baseUrl}/${circuitId}.prover`),
+              fetch(`${baseUrl}/${circuitId}.verifier`)
+            ]);
+            return {
+              proverKey: async () => new Uint8Array(await proverRes.arrayBuffer()),
+              verifierKey: async () => new Uint8Array(await verifierRes.arrayBuffer()),
+            };
+          }
+        },
+        proofProvider,
+        walletProvider,
+        midnightProvider,
+      };
+
+      const baseContract = CompiledContract.make('TreasuryVault', Contract);
+      const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
+
+      setStatus(`Calling deposit(${depositAmount}) on contract...`);
+      const callResult = await submitCallTx(providers as any, {
+        compiledContract: compiledContract as any,
+        contractAddress: targetAddress,
+        circuitId: 'deposit',
+        args: [BigInt(depositAmount)],
+        privateStateKey: 'treasuryVaultPrivateState',
+      });
+
+      const callTxHash = callResult?.public?.txHash || 'Submitted to 1AM';
+      setCircuitTxHash(String(callTxHash));
+      setStatus(`Success! Deposited ${depositAmount} units into Treasury Vault.`);
+    } catch (err: any) {
+      console.error(err);
+      setStatus(`Deposit Error: ${err.message || String(err)}`);
+    } finally {
+      setCallingCircuit(false);
+    }
+  };
   const [loading, setLoading] = useState<boolean>(false);
   const [diag, setDiag] = useState<string>('');
   const [activeStep, setActiveStep] = useState<string>('');
