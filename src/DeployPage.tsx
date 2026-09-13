@@ -130,18 +130,44 @@ export default function DeployPage() {
         },
         publicDataProvider,
         zkConfigProvider: {
-          getZkConfig: async (circuitId: string) => {
-            const baseUrl = window.location.origin + '/TreasuryVault/keys';
-            const [proverRes, verifierRes] = await Promise.all([
-              fetch(`${baseUrl}/${circuitId}.prover`),
-              fetch(`${baseUrl}/${circuitId}.verifier`)
+          getVerifierKey: async (circuitId: string) => {
+            const res = await fetch(`${window.location.origin}/TreasuryVault/keys/${circuitId}.verifier`);
+            if (!res.ok) throw new Error(`Failed to fetch verifier key for ${circuitId}: ${res.statusText}`);
+            return new Uint8Array(await res.arrayBuffer()) as any;
+          },
+          getProverKey: async (circuitId: string) => {
+            const res = await fetch(`${window.location.origin}/TreasuryVault/keys/${circuitId}.prover`);
+            if (!res.ok) throw new Error(`Failed to fetch prover key for ${circuitId}: ${res.statusText}`);
+            return new Uint8Array(await res.arrayBuffer()) as any;
+          },
+          getZKIR: async (circuitId: string) => {
+            const res = await fetch(`${window.location.origin}/TreasuryVault/zkir/${circuitId}.zkir`);
+            if (!res.ok) throw new Error(`Failed to fetch ZKIR for ${circuitId}: ${res.statusText}`);
+            return new Uint8Array(await res.arrayBuffer()) as any;
+          },
+          getVerifierKeys: async (circuitIds: string[]) => {
+            return Promise.all(
+              circuitIds.map(async (id) => {
+                const res = await fetch(`${window.location.origin}/TreasuryVault/keys/${id}.verifier`);
+                if (!res.ok) throw new Error(`Failed to fetch verifier key for ${id}: ${res.statusText}`);
+                const key = new Uint8Array(await res.arrayBuffer()) as any;
+                return [id, key] as [string, any];
+              })
+            );
+          },
+          get: async (circuitId: string) => {
+            const [verifierRes, proverRes, zkirRes] = await Promise.all([
+              fetch(`${window.location.origin}/TreasuryVault/keys/${circuitId}.verifier`),
+              fetch(`${window.location.origin}/TreasuryVault/keys/${circuitId}.prover`),
+              fetch(`${window.location.origin}/TreasuryVault/zkir/${circuitId}.zkir`)
             ]);
             return {
-              proverKey: async () => new Uint8Array(await proverRes.arrayBuffer()),
-              verifierKey: async () => new Uint8Array(await verifierRes.arrayBuffer()),
+              verifierKey: new Uint8Array(await verifierRes.arrayBuffer()) as any,
+              proverKey: new Uint8Array(await proverRes.arrayBuffer()) as any,
+              zkir: new Uint8Array(await zkirRes.arrayBuffer()) as any
             };
           }
-        },
+        } as any,
         proofProvider,
         walletProvider,
         midnightProvider,
@@ -319,18 +345,44 @@ export default function DeployPage() {
         },
         publicDataProvider,
         zkConfigProvider: {
-          getZkConfig: async (circuitId: string) => {
-            const baseUrl = window.location.origin + '/TreasuryVault/keys';
-            const [proverRes, verifierRes] = await Promise.all([
-              fetch(`${baseUrl}/${circuitId}.prover`),
-              fetch(`${baseUrl}/${circuitId}.verifier`)
+          getVerifierKey: async (circuitId: string) => {
+            const res = await fetch(`${window.location.origin}/TreasuryVault/keys/${circuitId}.verifier`);
+            if (!res.ok) throw new Error(`Failed to fetch verifier key for ${circuitId}: ${res.statusText}`);
+            return new Uint8Array(await res.arrayBuffer()) as any;
+          },
+          getProverKey: async (circuitId: string) => {
+            const res = await fetch(`${window.location.origin}/TreasuryVault/keys/${circuitId}.prover`);
+            if (!res.ok) throw new Error(`Failed to fetch prover key for ${circuitId}: ${res.statusText}`);
+            return new Uint8Array(await res.arrayBuffer()) as any;
+          },
+          getZKIR: async (circuitId: string) => {
+            const res = await fetch(`${window.location.origin}/TreasuryVault/zkir/${circuitId}.zkir`);
+            if (!res.ok) throw new Error(`Failed to fetch ZKIR for ${circuitId}: ${res.statusText}`);
+            return new Uint8Array(await res.arrayBuffer()) as any;
+          },
+          getVerifierKeys: async (circuitIds: string[]) => {
+            return Promise.all(
+              circuitIds.map(async (id) => {
+                const res = await fetch(`${window.location.origin}/TreasuryVault/keys/${id}.verifier`);
+                if (!res.ok) throw new Error(`Failed to fetch verifier key for ${id}: ${res.statusText}`);
+                const key = new Uint8Array(await res.arrayBuffer()) as any;
+                return [id, key] as [string, any];
+              })
+            );
+          },
+          get: async (circuitId: string) => {
+            const [verifierRes, proverRes, zkirRes] = await Promise.all([
+              fetch(`${window.location.origin}/TreasuryVault/keys/${circuitId}.verifier`),
+              fetch(`${window.location.origin}/TreasuryVault/keys/${circuitId}.prover`),
+              fetch(`${window.location.origin}/TreasuryVault/zkir/${circuitId}.zkir`)
             ]);
             return {
-              proverKey: async () => new Uint8Array(await proverRes.arrayBuffer()),
-              verifierKey: async () => new Uint8Array(await verifierRes.arrayBuffer()),
+              verifierKey: new Uint8Array(await verifierRes.arrayBuffer()) as any,
+              proverKey: new Uint8Array(await proverRes.arrayBuffer()) as any,
+              zkir: new Uint8Array(await zkirRes.arrayBuffer()) as any
             };
           }
-        },
+        } as any,
         proofProvider,
         walletProvider,
         midnightProvider,
