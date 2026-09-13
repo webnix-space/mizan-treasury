@@ -131,7 +131,7 @@ export default function DeployPage() {
         publicDataProvider,
         zkConfigProvider: {
           getZkConfig: async (circuitId: string) => {
-            const baseUrl = window.location.origin + '/TreasuryVault';
+            const baseUrl = window.location.origin + '/TreasuryVault/keys';
             const [proverRes, verifierRes] = await Promise.all([
               fetch(`${baseUrl}/${circuitId}.prover`),
               fetch(`${baseUrl}/${circuitId}.verifier`)
@@ -320,7 +320,7 @@ export default function DeployPage() {
         publicDataProvider,
         zkConfigProvider: {
           getZkConfig: async (circuitId: string) => {
-            const baseUrl = window.location.origin + '/TreasuryVault';
+            const baseUrl = window.location.origin + '/TreasuryVault/keys';
             const [proverRes, verifierRes] = await Promise.all([
               fetch(`${baseUrl}/${circuitId}.prover`),
               fetch(`${baseUrl}/${circuitId}.verifier`)
