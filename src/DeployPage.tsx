@@ -147,8 +147,10 @@ export default function DeployPage() {
         midnightProvider,
       };
 
-      const baseContract = CompiledContract.make('TreasuryVault', Contract);
-      const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
+      const witnesses = {
+        secretOwnerKey: () => new Uint8Array(32).fill(1),
+      };
+      const compiledContract = CompiledContract.make('TreasuryVault', Contract, witnesses);
 
       setStatus(`Calling deposit(${depositAmount}) on contract...`);
       const callResult = await submitCallTx(providers as any, {
@@ -330,8 +332,10 @@ export default function DeployPage() {
         midnightProvider,
       };
 
-      const baseContract = CompiledContract.make('TreasuryVault', Contract);
-      const compiledContract = CompiledContract.withVacantWitnesses(baseContract);
+      const witnesses = {
+        secretOwnerKey: () => new Uint8Array(32).fill(1),
+      };
+      const compiledContract = CompiledContract.make('TreasuryVault', Contract, witnesses);
 
       setActiveStep('deployContract executing...');
       setStatus('Step 3: Generating circuit proof & submitting contract...');
