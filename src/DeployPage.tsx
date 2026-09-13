@@ -63,8 +63,126 @@ export default function DeployPage() {
   const [contractAddress, setContractAddress] = useState<string>('');
   const [txHash, setTxHash] = useState<string>('');
   const [depositAmount, setDepositAmount] = useState<string>('1000');
+  const [initializing, setInitializing] = useState<boolean>(false);
   const [callingCircuit, setCallingCircuit] = useState<boolean>(false);
   const [circuitTxHash, setCircuitTxHash] = useState<string>('');
+
+  const handleInitialize = async () => {
+    const targetAddress = contractAddress || 'f3733a846138f879401af42a5cdb24b4095716931cd84cc067c1fc915c0f8330';
+    if (!targetAddress) {
+      setStatus('Error: Contract address missing.');
+      return;
+    }
+    try {
+      setInitializing(true);
+      setStatus('Connecting wallet to initialize vault...');
+      const midnight = (window as any).midnight;
+      const api = await midnight[selectedWallet].enable();
+
+      const walletProvider = {
+        coinPublicKey: async () => {
+          const addrs = await api.getShieldedAddresses();
+          return addrs[0];
+        },
+        balanceTx: async (tx: any) => {
+          const serialized = typeof tx.serialize === 'function' ? tx.serialize() : tx;
+          const hex = Array.from(serialized instanceof Uint8Array ? serialized : new Uint8Array(serialized))
+            .map((b: any) => b.toString(16).padStart(2, '0'))
+            .join('');
+          const balancedHex = await (api as any).balanceSealedTransaction(hex);
+          const bytes = new Uint8Array(balancedHex.match(/.{1,2}/g).map((byte: string) => parseInt(byte, 16)));
+          return typeof (tx.constructor as any).deserialize === 'function' ? (tx.constructor as any).deserialize(bytes) : bytes;
+        },
+      };
+
+      const midnightProvider = {
+        submitTx: async (tx: any) => {
+          setStatus('Broadcasting initialize transaction...');
+          const serialized = typeof tx.serialize === 'function' ? tx.serialize() : tx;
+          const hex = Array.from(serialized instanceof Uint8Array ? serialized : new Uint8Array(serialized))
+            .map((b: any) => b.toString(16).padStart(2, '0'))
+            .join('');
+          await (api as any).submitTransaction(hex);
+          const txId = typeof tx.identifiers === 'function' ? tx.identifiers()[0] : (tx.id || hex.slice(0, 32));
+          return String(txId);
+        },
+      };
+
+      const publicDataProvider = indexerPublicDataProvider(
+        'https://indexer.preprod.midnight.network/api/v3/graphql',
+        'wss://indexer.preprod.midnight.network/api/v3/graphql/ws',
+        typeof window !== 'undefined' ? (window.WebSocket as any) : undefined
+      );
+
+      const proofProvider = httpClientProofProvider('https://api-preprod.1am.xyz');
+
+      const providers = {
+        privateStateProvider: {
+          ...inMemoryPrivateStateProvider(),
+          setContractAddress: async () => {},
+          getSigningKey: async () => null,
+          setSigningKey: async () => {},
+          removeSigningKey: async () => {},
+          clearSigningKeys: async () => {},
+        },
+        publicDataProvider,
+        zkConfigProvider: {
+          getVerifierKey: async (circuitId: string) => {
+            const res = await fetch(`${window.location.origin}/TreasuryVault/keys/${circuitId}.verifier`);
+            if (!res.ok) throw new Error(`Failed to fetch verifier key for ${circuitId}: ${res.statusText}`);
+            return new Uint8Array(await res.arrayBuffer()) as any;
+          },
+          getProverKey: async (circuitId: string) => {
+            const res = await fetch(`${window.location.origin}/TreasuryVault/keys/${circuitId}.prover`);
+            if (!res.ok) throw new Error(`Failed to fetch prover key for ${circuitId}: ${res.statusText}`);
+            return new Uint8Array(await res.arrayBuffer()) as any;
+          },
+          getZKIR: async (circuitId: string) => {
+            const res = await fetch(`${window.location.origin}/TreasuryVault/zkir/${circuitId}.zkir`);
+            if (!res.ok) throw new Error(`Failed to fetch ZKIR for ${circuitId}: ${res.statusText}`);
+            return new Uint8Array(await res.arrayBuffer()) as any;
+          },
+          getVerifierKeys: async (circuitIds: string[]) => {
+            return Promise.all(
+              circuitIds.map(async (id) => {
+                const res = await fetch(`${window.location.origin}/TreasuryVault/keys/${id}.verifier`);
+                if (!res.ok) throw new Error(`Failed to fetch verifier key for ${id}: ${res.statusText}`);
+                const key = new Uint8Array(await res.arrayBuffer()) as any;
+                return [id, key] as [string, any];
+              })
+            );
+          },
+        } as any,
+        proofProvider,
+        walletProvider,
+        midnightProvider,
+      };
+
+      const witnesses = {
+        secretOwnerKey: () => new Uint8Array(32).fill(1),
+      };
+      const baseContract = CompiledContract.make('TreasuryVault', Contract);
+      const compiledContract = CompiledContract.withWitnesses(baseContract, witnesses);
+
+      setStatus('Calling initialize(0) circuit proof...');
+      const callResult = await submitCallTx(providers as any, {
+        compiledContract: compiledContract as any,
+        contractAddress: targetAddress,
+        circuitId: 'initialize',
+        args: [0n],
+        privateStateKey: 'treasuryVaultPrivateState',
+      });
+
+      const callTxHash = callResult?.public?.txHash || 'Submitted';
+      setCircuitTxHash(String(callTxHash));
+      setStatus('Success! Treasury Vault initialized. You can now deposit.');
+    } catch (err: any) {
+      console.error(err);
+      setStatus(`Initialize Error: ${err.message || String(err)}`);
+    } finally {
+      setInitializing(false);
+    }
+  };
 
   const handleDeposit = async () => {
     if (!contractAddress && !deployedContractFallback) {
@@ -500,6 +618,23 @@ export default function DeployPage() {
           Target: <code style={{ color: '#34d399' }}>{contractAddress || '2dd4b32e809cc8ed9964b19cba2b6af45b0d572106218b86eeb8956aa782295c'}</code>
         </p>
 
+                <button
+          onClick={handleInitialize}
+          disabled={initializing}
+          style={{
+            width: '100%',
+            padding: '0.75rem',
+            marginBottom: '1rem',
+            background: '#8b5cf6',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            fontWeight: '600',
+            cursor: initializing ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {initializing ? 'Initializing...' : 'Initialize Vault (circuit: initialize)'}
+        </button>
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
           <input
             type="number"
