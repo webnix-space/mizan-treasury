@@ -1,34 +1,32 @@
-module TreasuryVault {
-  // Public transparent state
-  export ledger totalVaultReserves: Uint<64>;
-  export ledger isInitialized: Boolean;
+// Public transparent state
+export ledger totalVaultReserves: Uint<64>;
+export ledger isInitialized: Boolean;
 
-  // Zero-Knowledge private witness
-  witness secretOwnerKey(): Bytes<32>;
+// Zero-Knowledge private witness
+witness secretOwnerKey(): Bytes<32>;
 
-  // Initialize vault
-  export circuit initialize(initialAmount: Uint<64>): [] {
-    assert(!isInitialized, "Vault already initialized");
-    
-    isInitialized = true;
-    totalVaultReserves = initialAmount;
-  }
+// Initialize vault
+export circuit initialize(initialAmount: Uint<64>): [] {
+  assert(!isInitialized, "Vault already initialized");
 
-  // Shielded deposit
-  export circuit deposit(amount: Uint<64>): [] {
-    assert(isInitialized, "Vault not initialized");
-    assert(amount > 0, "Deposit amount must be positive");
+  isInitialized = true;
+  totalVaultReserves = disclose(initialAmount);
+}
 
-    totalVaultReserves = (totalVaultReserves + amount) as Uint<64>;
-  }
+// Shielded deposit
+export circuit deposit(amount: Uint<64>): [] {
+  assert(isInitialized, "Vault not initialized");
+  assert(amount > 0, "Deposit amount must be positive");
 
-  // Shielded withdrawal with zero-knowledge witness check
-  export circuit withdraw(amount: Uint<64>): [] {
-    assert(isInitialized, "Vault not initialized");
-    assert(totalVaultReserves >= amount, "Insufficient vault reserves");
+  totalVaultReserves = (totalVaultReserves + disclose(amount)) as Uint<64>;
+}
 
-    assert(secretOwnerKey() != default<Bytes<32>>, "Unauthorized private witness");
+// Shielded withdrawal with zero-knowledge witness check
+export circuit withdraw(amount: Uint<64>): [] {
+  assert(isInitialized, "Vault not initialized");
+  assert(totalVaultReserves >= amount, "Insufficient vault reserves");
 
-    totalVaultReserves = (totalVaultReserves - amount) as Uint<64>;
-  }
+  assert(secretOwnerKey() != default<Bytes<32>>, "Unauthorized private witness");
+
+  totalVaultReserves = (totalVaultReserves - disclose(amount)) as Uint<64>;
 }
