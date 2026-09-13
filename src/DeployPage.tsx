@@ -150,7 +150,8 @@ export default function DeployPage() {
       const witnesses = {
         secretOwnerKey: () => new Uint8Array(32).fill(1),
       };
-      const compiledContract = CompiledContract.make('TreasuryVault', Contract, witnesses);
+      const baseContract = CompiledContract.make('TreasuryVault', Contract);
+      const compiledContract = CompiledContract.withWitnesses(baseContract, witnesses);
 
       setStatus(`Calling deposit(${depositAmount}) on contract...`);
       const callResult = await submitCallTx(providers as any, {
@@ -335,7 +336,8 @@ export default function DeployPage() {
       const witnesses = {
         secretOwnerKey: () => new Uint8Array(32).fill(1),
       };
-      const compiledContract = CompiledContract.make('TreasuryVault', Contract, witnesses);
+      const baseContract = CompiledContract.make('TreasuryVault', Contract);
+      const compiledContract = CompiledContract.withWitnesses(baseContract, witnesses);
 
       setActiveStep('deployContract executing...');
       setStatus('Step 3: Generating circuit proof & submitting contract...');
