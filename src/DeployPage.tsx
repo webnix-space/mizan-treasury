@@ -68,30 +68,36 @@ export default function DeployPage() {
   const [circuitTxHash, setCircuitTxHash] = useState<string>('');
 
   const handleInitialize = async () => {
-    const targetAddress = contractAddress || 'f3733a846138f879401af42a5cdb24b4095716931cd84cc067c1fc915c0f8330';
+    const targetAddress = contractAddress || '128fd6376fff7e49fb9d445b0d72e209355362c928a750073a18e3dc120ce4f1';
     if (!targetAddress) {
-      setStatus('Error: Contract address missing.');
+      alert('No contract address found');
       return;
     }
+    setInitializing(true);
+    setStatus('Preparing initialize circuit transaction...');
     try {
-      setInitializing(true);
-      setStatus('Connecting wallet to initialize vault...');
-      const midnight = (window as any).midnight;
-      const api = await midnight[selectedWallet].enable();
+      const midnightObj = (window as any).midnight;
+      const walletKey = selectedWallet || (midnightObj && Object.keys(midnightObj)[0]) || '1am';
+      const entry = midnightObj[walletKey];
+      const api = typeof entry?.connect === 'function' ? await entry.connect('preprod') : (typeof entry?.enable === 'function' ? await entry.enable() : entry);
+
+      const shieldedInfo = await (api as any).getShieldedAddresses();
+      const shieldedCpk = shieldedInfo?.shieldedCoinPublicKey;
+      const shieldedEpk = shieldedInfo?.shieldedEncryptionPublicKey;
 
       const walletProvider = {
-        coinPublicKey: async () => {
-          const addrs = await api.getShieldedAddresses();
-          return addrs[0];
-        },
+        getCoinPublicKey: () => shieldedCpk,
+        getEncryptionPublicKey: () => shieldedEpk,
         balanceTx: async (tx: any) => {
+          setStatus('Balancing initialize transaction with 1AM...');
           const serialized = typeof tx.serialize === 'function' ? tx.serialize() : tx;
           const hex = Array.from(serialized instanceof Uint8Array ? serialized : new Uint8Array(serialized))
             .map((b: any) => b.toString(16).padStart(2, '0'))
             .join('');
-          const balancedHex = await (api as any).balanceSealedTransaction(hex);
-          const bytes = new Uint8Array(balancedHex.match(/.{1,2}/g).map((byte: string) => parseInt(byte, 16)));
-          return typeof (tx.constructor as any).deserialize === 'function' ? (tx.constructor as any).deserialize(bytes) : bytes;
+          const result = await (api as any).balanceUnsealedTransaction(hex);
+          const { Transaction } = await import('@midnight-ntwrk/ledger-v8');
+          const bytes = new Uint8Array(result.tx.match(/.{2}/g).map((b: string) => parseInt(b, 16)));
+          return Transaction.deserialize('signature', 'proof', 'binding', bytes);
         },
       };
 
@@ -164,7 +170,7 @@ export default function DeployPage() {
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
       const compiledContract = CompiledContract.withWitnesses(baseContract, witnesses);
 
-      setStatus('Calling initialize(0) circuit proof...');
+      setStatus('Submitting initialize(0) call...');
       const callResult = await submitCallTx(providers as any, {
         compiledContract: compiledContract as any,
         contractAddress: targetAddress,
@@ -173,9 +179,9 @@ export default function DeployPage() {
         privateStateKey: 'treasuryVaultPrivateState',
       });
 
-      const callTxHash = callResult?.public?.txHash || 'Submitted';
+      const callTxHash = callResult?.public?.txHash || 'Submitted to 1AM';
       setCircuitTxHash(String(callTxHash));
-      setStatus('Success! Treasury Vault initialized. You can now deposit.');
+      setStatus('Success! Treasury Vault initialized. Ready for deposit.');
     } catch (err: any) {
       console.error(err);
       setStatus(`Initialize Error: ${err.message || String(err)}`);
