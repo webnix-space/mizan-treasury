@@ -19,10 +19,14 @@ try {
 
 const getKeyMaterialProvider = () => ({
   getZKIR: async (circuitId: string) => {
-    const res = await fetch(`${window.location.origin}/TreasuryVault/zkir/${circuitId}.zkir`);
-    if (!res.ok) throw new Error(`Failed to fetch ZKIR for ${circuitId}: ${res.statusText}`);
-    return new Uint8Array(await res.arrayBuffer());
-  },
+            const res = await fetch(`${window.location.origin}/TreasuryVault/zkir/${circuitId}.zkir`);
+            if (!res.ok) throw new Error(`Failed to fetch ZKIR for ${circuitId}: ${res.statusText}`);
+            const rawText = await res.text();
+            const tagged = rawText.startsWith('midnight:ir-source')
+              ? rawText
+              : `midnight:ir-source[v2]:${rawText.trim()}`;
+            return new TextEncoder().encode(tagged) as any;
+          },
   getProverKey: async (circuitId: string) => {
     const res = await fetch(`${window.location.origin}/TreasuryVault/keys/${circuitId}.prover`);
     if (!res.ok) throw new Error(`Failed to fetch prover key for ${circuitId}: ${res.statusText}`);
@@ -174,7 +178,11 @@ export default function DeployPage() {
           getZKIR: async (circuitId: string) => {
             const res = await fetch(`${window.location.origin}/TreasuryVault/zkir/${circuitId}.zkir`);
             if (!res.ok) throw new Error(`Failed to fetch ZKIR for ${circuitId}: ${res.statusText}`);
-            return new Uint8Array(await res.arrayBuffer()) as any;
+            const rawText = await res.text();
+            const tagged = rawText.startsWith('midnight:ir-source')
+              ? rawText
+              : `midnight:ir-source[v2]:${rawText.trim()}`;
+            return new TextEncoder().encode(tagged) as any;
           },
           getVerifierKeys: async (circuitIds: string[]) => {
             return Promise.all(
@@ -303,7 +311,11 @@ export default function DeployPage() {
           getZKIR: async (circuitId: string) => {
             const res = await fetch(`${window.location.origin}/TreasuryVault/zkir/${circuitId}.zkir`);
             if (!res.ok) throw new Error(`Failed to fetch ZKIR for ${circuitId}: ${res.statusText}`);
-            return new Uint8Array(await res.arrayBuffer()) as any;
+            const rawText = await res.text();
+            const tagged = rawText.startsWith('midnight:ir-source')
+              ? rawText
+              : `midnight:ir-source[v2]:${rawText.trim()}`;
+            return new TextEncoder().encode(tagged) as any;
           },
           getVerifierKeys: async (circuitIds: string[]) => {
             return Promise.all(
@@ -518,7 +530,11 @@ export default function DeployPage() {
           getZKIR: async (circuitId: string) => {
             const res = await fetch(`${window.location.origin}/TreasuryVault/zkir/${circuitId}.zkir`);
             if (!res.ok) throw new Error(`Failed to fetch ZKIR for ${circuitId}: ${res.statusText}`);
-            return new Uint8Array(await res.arrayBuffer()) as any;
+            const rawText = await res.text();
+            const tagged = rawText.startsWith('midnight:ir-source')
+              ? rawText
+              : `midnight:ir-source[v2]:${rawText.trim()}`;
+            return new TextEncoder().encode(tagged) as any;
           },
           getVerifierKeys: async (circuitIds: string[]) => {
             return Promise.all(
