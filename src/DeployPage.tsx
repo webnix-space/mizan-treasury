@@ -4,6 +4,7 @@ import { CompiledContract } from '@midnight-ntwrk/compact-js';
 import { deployContract, submitCallTx } from '@midnight-ntwrk/midnight-js-contracts';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
+import { createProofProvider } from '@midnight-ntwrk/midnight-js-types';
 import { Contract } from '../contracts/managed/TreasuryVault/contract/index.js';
 import { bech32, bech32m } from 'bech32';
 
@@ -14,6 +15,25 @@ try {
     setNetworkId('undeployed');
   } catch (_) {}
 }
+
+
+const getKeyMaterialProvider = () => ({
+  getZKIR: async (circuitId: string) => {
+    const res = await fetch(`${window.location.origin}/TreasuryVault/zkir/${circuitId}.zkir`);
+    if (!res.ok) throw new Error(`Failed to fetch ZKIR for ${circuitId}: ${res.statusText}`);
+    return new Uint8Array(await res.arrayBuffer());
+  },
+  getProverKey: async (circuitId: string) => {
+    const res = await fetch(`${window.location.origin}/TreasuryVault/keys/${circuitId}.prover`);
+    if (!res.ok) throw new Error(`Failed to fetch prover key for ${circuitId}: ${res.statusText}`);
+    return new Uint8Array(await res.arrayBuffer());
+  },
+  getVerifierKey: async (circuitId: string) => {
+    const res = await fetch(`${window.location.origin}/TreasuryVault/keys/${circuitId}.verifier`);
+    if (!res.ok) throw new Error(`Failed to fetch verifier key for ${circuitId}: ${res.statusText}`);
+    return new Uint8Array(await res.arrayBuffer());
+  },
+});
 
 function inMemoryPrivateStateProvider() {
   const store = new Map<string, any>();
@@ -120,7 +140,15 @@ export default function DeployPage() {
         typeof window !== 'undefined' ? (window.WebSocket as any) : undefined
       );
 
-      const proofProvider = httpClientProofProvider('https://api-preprod.1am.xyz');
+      const keyMaterialProvider = getKeyMaterialProvider();
+      let proofProvider: any;
+      if (typeof (api as any).getProvingProvider === 'function') {
+        setStatus('Initializing 1AM native proving provider...');
+        const nativeProver = await (api as any).getProvingProvider(keyMaterialProvider);
+        proofProvider = createProofProvider(nativeProver);
+      } else {
+        proofProvider = httpClientProofProvider('https://api-preprod.1am.xyz');
+      }
 
       const providers = {
         privateStateProvider: {
@@ -241,7 +269,15 @@ export default function DeployPage() {
         typeof window !== 'undefined' ? (window.WebSocket as any) : undefined
       );
 
-      const proofProvider = httpClientProofProvider('https://api-preprod.1am.xyz');
+      const keyMaterialProvider = getKeyMaterialProvider();
+      let proofProvider: any;
+      if (typeof (api as any).getProvingProvider === 'function') {
+        setStatus('Initializing 1AM native proving provider...');
+        const nativeProver = await (api as any).getProvingProvider(keyMaterialProvider);
+        proofProvider = createProofProvider(nativeProver);
+      } else {
+        proofProvider = httpClientProofProvider('https://api-preprod.1am.xyz');
+      }
 
       const providers = {
         privateStateProvider: {
