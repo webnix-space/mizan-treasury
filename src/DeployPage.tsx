@@ -712,7 +712,7 @@ export default function DeployPage() {
 
         {circuitTxHash && (
           <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#064e3b', borderRadius: '6px', wordBreak: 'break-all', fontSize: '0.85rem' }}>
-            ✓ Deposit Submitted! Tx: {circuitTxHash}
+            ✓ Transaction Submitted! Tx: {circuitTxHash}
           </div>
         )}
       </div>
