@@ -87,6 +87,38 @@ export default function DeployPage() {
   const [callingCircuit, setCallingCircuit] = useState<boolean>(false);
   const [circuitTxHash, setCircuitTxHash] = useState<string>('');
 
+    const [vaultReserves, setVaultReserves] = useState<string | null>(null);
+  const [vaultInitState, setVaultInitState] = useState<boolean | null>(null);
+  const [queryingState, setQueryingState] = useState<boolean>(false);
+
+  const queryVaultState = async () => {
+    const targetAddress = contractAddress || 'f66688e31ec9ce1665a54336aae31a82c3534db9437e8d3278b66c9cc4c80ea4';
+    setQueryingState(true);
+    setStatus('Querying public state from Midnight Preprod indexer...');
+    try {
+      const publicDataProvider = indexerPublicDataProvider(
+        'https://indexer.preprod.midnight.network/api/v3/graphql',
+        'wss://indexer.preprod.midnight.network/api/v3/graphql/ws',
+        typeof window !== 'undefined' ? (window.WebSocket as any) : undefined
+      );
+      const state = await publicDataProvider.queryContractState(targetAddress);
+      if (state) {
+        const rawReserves = (state as any)?.data?.totalVaultReserves ?? (state as any)?.totalVaultReserves;
+        const rawInit = (state as any)?.data?.isInitialized ?? (state as any)?.isInitialized;
+        setVaultReserves(rawReserves !== undefined ? String(rawReserves) : JSON.stringify(state));
+        setVaultInitState(Boolean(rawInit));
+        setStatus('Live public state retrieved from Midnight ledger.');
+      } else {
+        setStatus('Contract found, but state is currently unindexed or pending block confirmation.');
+      }
+    } catch (e: any) {
+      console.error(e);
+      setStatus('State Query Error: ' + (e.message || String(e)));
+    } finally {
+      setQueryingState(false);
+    }
+  };
+
   const handleInitialize = async () => {
     const targetAddress = contractAddress || '128fd6376fff7e49fb9d445b0d72e209355362c928a750073a18e3dc120ce4f1';
     if (!targetAddress) {
@@ -709,6 +741,32 @@ export default function DeployPage() {
             ✓ Transaction Submitted! Tx: {circuitTxHash}
           </div>
         )}
+
+        <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid #334155' }}>
+          <button
+            onClick={queryVaultState}
+            disabled={queryingState}
+            style={{
+              width: '100%',
+              padding: '0.65rem',
+              backgroundColor: queryingState ? '#475569' : '#10b981',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              fontWeight: 'bold',
+              cursor: queryingState ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {queryingState ? 'Querying Indexer...' : '↻ Query Vault Public State'}
+          </button>
+
+          {vaultReserves !== null && (
+            <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '6px', fontSize: '0.85rem' }}>
+              <div><strong>isInitialized:</strong> <span style={{ color: '#10b981' }}>{vaultInitState ? 'true' : 'false'}</span></div>
+              <div style={{ marginTop: '0.35rem' }}><strong>totalVaultReserves:</strong> <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{vaultReserves}</span></div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
