@@ -223,7 +223,7 @@ export default function DeployPage() {
       alert('No contract address found');
       return;
     }
-    const targetAddress = contractAddress || 'cfa163a00c4712399a4b673ec5233bfe8128cbd7b320f8ced3a771491adf8ddf';
+    const targetAddress = contractAddress || '128fd6376fff7e49fb9d445b0d72e209355362c928a750073a18e3dc120ce4f1';
     setCallingCircuit(true);
     setStatus('Preparing deposit circuit transaction...');
     try {
@@ -337,10 +337,7 @@ export default function DeployPage() {
         secretOwnerKey: () => new Uint8Array(32).fill(1),
       };
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
-      const withPath = typeof (CompiledContract as any).withCompiledAssetsPath === 'function'
-        ? (CompiledContract as any).withCompiledAssetsPath(baseContract, '/TreasuryVault')
-        : baseContract;
-      const compiledContract = CompiledContract.withWitnesses(withPath, witnesses);
+      const compiledContract = CompiledContract.withWitnesses(baseContract, witnesses);
 
       setStatus(`Calling deposit(${depositAmount}) on contract...`);
       const callResult = await submitCallTx(providers as any, {
@@ -552,10 +549,7 @@ export default function DeployPage() {
         secretOwnerKey: () => new Uint8Array(32).fill(1),
       };
       const baseContract = CompiledContract.make('TreasuryVault', Contract);
-      const withPath = typeof (CompiledContract as any).withCompiledAssetsPath === 'function'
-        ? (CompiledContract as any).withCompiledAssetsPath(baseContract, '/TreasuryVault')
-        : baseContract;
-      const compiledContract = CompiledContract.withWitnesses(withPath, witnesses);
+      const compiledContract = CompiledContract.withWitnesses(baseContract, witnesses);
 
       setActiveStep('deployContract executing...');
       setStatus('Step 3: Generating circuit proof & submitting contract...');
