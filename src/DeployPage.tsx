@@ -811,11 +811,11 @@ export default function MizanDashboard() {
                   <div>
                     <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc' }}>Compounding Reputation Engine</h2>
                     <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#94a3b8' }}>
-                      Cross-employer reputation scoring via encrypted peer ratings and aggregate zero-knowledge proofs[span_0](start_span)[span_0](end_span)[span_1](start_span)[span_1](end_span).
+                      Cross-employer reputation scoring via encrypted peer ratings and aggregate zero-knowledge proofs.
                     </p>
                   </div>
                   <span style={{ fontSize: '0.78rem', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '5px 14px', borderRadius: '20px', fontWeight: 700 }}>
-                    Wave 2 Roadmap Target[span_2](start_span)[span_2](end_span)
+                    Wave 2 Roadmap Target
                   </span>
                 </div>
 
@@ -824,7 +824,7 @@ export default function MizanDashboard() {
                   <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
                     <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Aggregate Skill Index</div>
                     <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#f8fafc', marginTop: '6px' }}>{repScore} / 100</div>
-                    <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '4px' }}>↑ +3.8% over last 6 months[span_3](start_span)[span_3](end_span)</div>
+                    <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '4px' }}>↑ +3.8% over last 6 months</div>
                   </div>
                   <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
                     <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Solvency Track Record</div>
@@ -841,21 +841,21 @@ export default function MizanDashboard() {
                 {/* Blueprint Breakdown */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
                   <div style={{ padding: '1.25rem', background: '#0c1220', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ fontWeight: 700, color: '#c084fc', marginBottom: '6px' }}>1. Encrypted Feedback System[span_4](start_span)[span_4](end_span)</div>
+                    <div style={{ fontWeight: 700, color: '#c084fc', marginBottom: '6px' }}>1. Encrypted Feedback System</div>
                     <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
-                      Employers submit peer ratings encrypted under the worker's key[span_5](start_span)[span_5](end_span). Raw feedback stays private while homomorphic aggregation updates public score tiers[span_6](start_span)[span_6](end_span).
+                      Employers submit peer ratings encrypted under the worker's key. Raw feedback stays private while homomorphic aggregation updates public score tiers.
                     </div>
                   </div>
                   <div style={{ padding: '1.25rem', background: '#0c1220', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ fontWeight: 700, color: '#38bdf8', marginBottom: '6px' }}>2. Cross-Employer Portability[span_7](start_span)[span_7](end_span)[span_8](start_span)[span_8](end_span)</div>
+                    <div style={{ fontWeight: 700, color: '#38bdf8', marginBottom: '6px' }}>2. Cross-Employer Portability</div>
                     <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
-                      Reputation compounds across multiple employers without linking employer addresses or revealing underlying payroll compensations[span_9](start_span)[span_9](end_span)[span_10](start_span)[span_10](end_span).
+                      Reputation compounds across multiple employers without linking employer addresses or revealing underlying payroll compensations.
                     </div>
                   </div>
                   <div style={{ padding: '1.25rem', background: '#0c1220', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ fontWeight: 700, color: '#34d399', marginBottom: '6px' }}>3. Reputation Marketplace[span_11](start_span)[span_11](end_span)</div>
+                    <div style={{ fontWeight: 700, color: '#34d399', marginBottom: '6px' }}>3. Reputation Marketplace</div>
                     <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
-                      Employers can query worker reputation threshold proofs (e.g., "Score ≥ 90 in Compact & ZK") without accessing private project history[span_12](start_span)[span_12](end_span).
+                      Employers can query worker reputation threshold proofs (e.g., "Score ≥ 90 in Compact & ZK") without accessing private project history.
                     </div>
                   </div>
                 </div>
@@ -864,7 +864,7 @@ export default function MizanDashboard() {
                 <div style={{ padding: '1.5rem', background: 'rgba(15, 23, 42, 0.9)', borderRadius: '10px', border: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                   <div>
                     <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>Simulate Encrypted Peer Attestation</div>
-                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '2px' }}>Test compounding reputation state logic for Wave 2 activation[span_13](start_span)[span_13](end_span).</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '2px' }}>Test compounding reputation state logic for Wave 2 activation.</div>
                   </div>
                   <button
                     onClick={() => {
@@ -889,19 +889,19 @@ export default function MizanDashboard() {
                   <div>
                     <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc' }}>Predictive Treasury: zkML Forecasting</h2>
                     <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#94a3b8' }}>
-                      Autonomous runway simulation and portfolio hedging via verified zero-knowledge machine learning inference[span_14](start_span)[span_14](end_span).
+                      Autonomous runway simulation and portfolio hedging via verified zero-knowledge machine learning inference.
                     </p>
                   </div>
                   <span style={{ fontSize: '0.78rem', background: 'rgba(139, 92, 246, 0.15)', color: '#c084fc', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '5px 14px', borderRadius: '20px', fontWeight: 700 }}>
-                    Wave 3 Roadmap Target[span_15](start_span)[span_15](end_span)[span_16](start_span)[span_16](end_span)
+                    Wave 3 Roadmap Target
                   </span>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
                   <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Monte Carlo Volatility Modeling[span_17](start_span)[span_17](end_span)</div>
+                    <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Monte Carlo Volatility Modeling</div>
                     <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
-                      Runs 1,000 simulated token price drawdowns to ensure runway survives market turbulence without exposing portfolio balances[span_18](start_span)[span_18](end_span).
+                      Runs 1,000 simulated token price drawdowns to ensure runway survives market turbulence without exposing portfolio balances.
                     </div>
                     <div style={{ height: '8px', background: '#1e293b', borderRadius: '4px', overflow: 'hidden', margin: '1.25rem 0' }}>
                       <div style={{ width: '70%', height: '100%', background: 'linear-gradient(90deg, #10b981, #38bdf8)' }}></div>
@@ -913,9 +913,9 @@ export default function MizanDashboard() {
                   </div>
 
                   <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ color: '#c084fc', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Autonomous Rebalance Optimization[span_19](start_span)[span_19](end_span)</div>
+                    <div style={{ color: '#c084fc', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Autonomous Rebalance Optimization</div>
                     <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
-                      Model generates ZK inference proof recommending token swap weights (e.g. ETH → USDC) to protect upcoming payroll periods[span_20](start_span)[span_20](end_span)[span_21](start_span)[span_21](end_span).
+                      Model generates ZK inference proof recommending token swap weights (e.g. ETH → USDC) to protect upcoming payroll periods.
                     </div>
                     <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: '#1e293b', borderRadius: '6px', fontSize: '0.75rem', color: '#a5b4fc', fontFamily: 'monospace' }}>
                       Inference Hash: zkml_ezkl_0x99a4...f01c
@@ -926,8 +926,8 @@ export default function MizanDashboard() {
                 {/* Interactive Simulator */}
                 <div style={{ padding: '1.5rem', background: 'rgba(15, 23, 42, 0.9)', borderRadius: '10px', border: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                   <div>
-                    <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>Execute zkML Inference Circuit Stress-Test[span_22](start_span)[span_22](end_span)</div>
-                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '2px' }}>Verify neural network inference integrity with zero proprietary weight leakage[span_23](start_span)[span_23](end_span).</div>
+                    <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>Execute zkML Inference Circuit Stress-Test</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '2px' }}>Verify neural network inference integrity with zero proprietary weight leakage.</div>
                   </div>
                   <button
                     onClick={handleRunAiSim}
@@ -955,44 +955,44 @@ export default function MizanDashboard() {
                   <div>
                     <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc' }}>Compliance Gateway & Selective Disclosure</h2>
                     <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#94a3b8' }}>
-                      Auditor portal for cryptographic verification of tax and OFAC compliance without mass surveillance[span_24](start_span)[span_24](end_span)[span_25](start_span)[span_25](end_span).
+                      Auditor portal for cryptographic verification of tax and OFAC compliance without mass surveillance.
                     </p>
                   </div>
                   <span style={{ fontSize: '0.78rem', background: 'rgba(139, 92, 246, 0.15)', color: '#c084fc', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '5px 14px', borderRadius: '20px', fontWeight: 700 }}>
-                    Wave 3 Roadmap Target[span_26](start_span)[span_26](end_span)[span_27](start_span)[span_27](end_span)
+                    Wave 3 Roadmap Target
                   </span>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
                   <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ color: '#10b981', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Clean Batch Sanctions Screening[span_28](start_span)[span_28](end_span)[span_29](start_span)[span_29](end_span)</div>
+                    <div style={{ color: '#10b981', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Clean Batch Sanctions Screening</div>
                     <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
-                      Proves that 100% of employee payment destinations passed OFAC checks via zero-knowledge membership proofs without disclosing addresses[span_30](start_span)[span_30](end_span)[span_31](start_span)[span_31](end_span).
+                      Proves that 100% of employee payment destinations passed OFAC checks via zero-knowledge membership proofs without disclosing addresses.
                     </div>
-                    <div style={{ marginTop: '1rem', color: '#34d399', fontSize: '0.75rem', fontWeight: 700 }}>✓ Screening Hash Committed On-Chain[span_32](start_span)[span_32](end_span)[span_33](start_span)[span_33](end_span)</div>
+                    <div style={{ marginTop: '1rem', color: '#34d399', fontSize: '0.75rem', fontWeight: 700 }}>✓ Screening Hash Committed On-Chain</div>
                   </div>
 
                   <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ color: '#c084fc', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Time-Scoped Audit Keys[span_34](start_span)[span_34](end_span)[span_35](start_span)[span_35](end_span)</div>
+                    <div style={{ color: '#c084fc', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Time-Scoped Audit Keys</div>
                     <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
-                      Designated CPAs or tax authorities decrypt solely the requested fiscal quarter (e.g. Q3 2026) without exposing lifetime company history[span_36](start_span)[span_36](end_span)[span_37](start_span)[span_37](end_span).
+                      Designated CPAs or tax authorities decrypt solely the requested fiscal quarter (e.g. Q3 2026) without exposing lifetime company history.
                     </div>
                     <div style={{ marginTop: '1rem', color: '#a5b4fc', fontSize: '0.75rem', fontFamily: 'monospace' }}>Key: auditor_pk_preprod_0x221</div>
                   </div>
 
                   <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Right to Erasure (GDPR)[span_38](start_span)[span_38](end_span)[span_39](start_span)[span_39](end_span)</div>
+                    <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Right to Erasure (GDPR)</div>
                     <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
-                      Revoking the auditor viewing key causes immediate mathematical shredding of historical decryptability, satisfying European data rights[span_40](start_span)[span_40](end_span)[span_41](start_span)[span_41](end_span).
+                      Revoking the auditor viewing key causes immediate mathematical shredding of historical decryptability, satisfying European data rights.
                     </div>
-                    <div style={{ marginTop: '1rem', color: '#38bdf8', fontSize: '0.75rem', fontWeight: 700 }}>Shredding Protocol Active[span_42](start_span)[span_42](end_span)</div>
+                    <div style={{ marginTop: '1rem', color: '#38bdf8', fontSize: '0.75rem', fontWeight: 700 }}>Shredding Protocol Active</div>
                   </div>
                 </div>
 
                 <div style={{ padding: '1.5rem', background: 'rgba(15, 23, 42, 0.9)', borderRadius: '10px', border: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                   <div>
-                    <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>Export Form 1099 / W-2 Verified Audit Package[span_43](start_span)[span_43](end_span)</div>
-                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '2px' }}>Generate certified tax withholding schedules without storing employee PII[span_44](start_span)[span_44](end_span).</div>
+                    <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>Export Form 1099 / W-2 Verified Audit Package</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '2px' }}>Generate certified tax withholding schedules without storing employee PII.</div>
                   </div>
                   <button
                     onClick={() => setStatus('Generated certified zero-knowledge tax withholding report.')}
@@ -1010,11 +1010,11 @@ export default function MizanDashboard() {
       {/* Global Responsive Footer */}
       <footer style={{ borderTop: '1px solid rgba(51, 65, 85, 0.4)', backgroundColor: 'rgba(9, 14, 26, 0.98)', padding: '1.25rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', fontSize: '0.8rem', color: '#64748b', zIndex: 50 }}>
         <div>
-          Built on Midnight Network | Apache 2.0 | Non-Custodial | <strong style={{ color: '#94a3b8' }}>Webnix</strong>[span_45](start_span)[span_45](end_span)[span_46](start_span)[span_46](end_span)
+          Built on Midnight Network | Apache 2.0 | Non-Custodial | <strong style={{ color: '#94a3b8' }}>Webnix</strong>
         </div>
         <div style={{ display: 'flex', gap: '1.5rem' }}>
           <span>Preprod: Synced</span>
-          <span style={{ color: '#34d399', fontWeight: 600 }}>Wave 1 Submission Ready[span_47](start_span)[span_47](end_span)</span>
+          <span style={{ color: '#34d399', fontWeight: 600 }}>Wave 1 Submission Ready</span>
         </div>
       </footer>
     </div>
