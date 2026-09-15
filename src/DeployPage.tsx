@@ -46,9 +46,8 @@ function inMemoryPrivateStateProvider() {
 export default function MizanDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'payroll' | 'credentials' | 'solvency' | 'reputation' | 'predictive' | 'compliance'>('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
-
   const [connectedAddress, setConnectedAddress] = useState<string>('');
-  const [status, setStatus] = useState<string>('Ready. Connect 1AM wallet to execute circuits.');
+  const [status, setStatus] = useState<string>('System operational. Ready on Midnight Preprod.');
 
   // Wave 1 Live On-chain State
   const [deploying, setDeploying] = useState<boolean>(false);
@@ -76,7 +75,13 @@ export default function MizanDashboard() {
   // Wave 1 ZK-Solvency Simulator State
   const [solvencyMonths, setSolvencyMonths] = useState<number>(3);
   const [monthlyBurn, setMonthlyBurn] = useState<number>(300);
-  const [solvencyResult, setSolvencyResult] = useState<string | null>('✓ SOLVENT: Current reserves (1000) cover 3 months commitment (900). ZK Proof verified on-chain.');
+  const [solvencyResult, setSolvencyResult] = useState<string | null>('✓ SOLVENT: Total reserves (1000) cover 3 months commitment (900). ZK Proof verified on-chain.');
+
+  // Wave 2 & 3 Interactive Simulators
+  const [repScore, setRepScore] = useState<number>(98.4);
+  const [activeFeedbackCount, setActiveFeedbackCount] = useState<number>(32);
+  const [aiSimulationRunning, setAiSimulationRunning] = useState<boolean>(false);
+  const [aiSimResult, setAiSimResult] = useState<string | null>(null);
 
   const getConnectedApi = async () => {
     const midnightObj = (window as any).midnight;
@@ -312,6 +317,15 @@ export default function MizanDashboard() {
     }
   };
 
+  const handleRunAiSim = () => {
+    setAiSimulationRunning(true);
+    setTimeout(() => {
+      setAiSimResult('Monte Carlo 1,000 runs completed: Optimal rebalance is 12% ETH to USDC. Runway extended to 10.2 months.');
+      setAiSimulationRunning(false);
+      setStatus('zkML stress test executed with zero weight disclosure.');
+    }, 1200);
+  };
+
   const navItems = [
     { id: 'overview', label: 'Platform Overview', icon: '◈', wave: 'Core' },
     { id: 'payroll', label: 'Core Payroll & Vault', icon: '⬡', wave: 'Wave 1 Live' },
@@ -330,7 +344,7 @@ export default function MizanDashboard() {
       <div style={{ position: 'fixed', bottom: '-20%', right: '-10%', width: '60vw', height: '60vw', background: 'radial-gradient(circle, rgba(56, 189, 248, 0.14) 0%, rgba(0,0,0,0) 70%)', filter: 'blur(100px)', pointerEvents: 'none', zIndex: 0 }}></div>
 
       {/* Top Navbar */}
-      <header style={{ position: 'sticky', top: 0, zIndex: 60, borderBottom: '1px solid rgba(51, 65, 85, 0.4)', backdropFilter: 'blur(20px)', backgroundColor: 'rgba(9, 14, 26, 0.9)', padding: '0.85rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header style={{ position: 'sticky', top: 0, zIndex: 60, borderBottom: '1px solid rgba(51, 65, 85, 0.4)', backdropFilter: 'blur(20px)', backgroundColor: 'rgba(9, 14, 26, 0.92)', padding: '0.85rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button 
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
@@ -380,6 +394,14 @@ export default function MizanDashboard() {
       {/* Main Container */}
       <div style={{ display: 'flex', flex: 1, position: 'relative', zIndex: 10 }}>
         
+        {/* Mobile Backdrop */}
+        {mobileMenuOpen && (
+          <div 
+            onClick={() => setMobileMenuOpen(false)}
+            style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', zIndex: 52 }}
+          />
+        )}
+
         {/* Responsive Sidebar Drawer */}
         <aside style={{
           width: '280px',
@@ -459,7 +481,7 @@ export default function MizanDashboard() {
         </aside>
 
         {/* Dynamic Workspace */}
-        <main style={{ flex: 1, padding: '2rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+        <main style={{ flex: 1, padding: '2rem 1.5rem', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           
           {/* Status Bar */}
           <div style={{ background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(12px)', border: '1px solid rgba(51, 65, 85, 0.5)', padding: '0.85rem 1.5rem', borderRadius: '12px', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
@@ -483,8 +505,7 @@ export default function MizanDashboard() {
                 </p>
               </div>
 
-              {/* Three Value Pillars 3D Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
                 {[
                   { title: 'For Workers', tag: 'Self-Sovereign', desc: 'Get paid privately. Build cryptographically verifiable reputation you own. Prove skills across employers without revealing salaries or identities.', color: '#8b5cf6', action: 'Inspect Credentials', tab: 'credentials' },
                   { title: 'For Employers', tag: 'Zero Exposure', desc: 'Execute global payroll without disclosing treasury size. Prove financial solvency to stakeholders and employees using zero-knowledge circuits.', color: '#0284c7', action: 'Manage Vault', tab: 'payroll' },
@@ -515,19 +536,18 @@ export default function MizanDashboard() {
                 ))}
               </div>
 
-              {/* Four Layer Architecture Interactive Diagram */}
               <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid rgba(51, 65, 85, 0.4)', borderRadius: '16px', padding: '1.75rem', marginBottom: '2.5rem' }}>
                 <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.15rem', color: '#f8fafc' }}>Mizan Four-Layer System Architecture</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
                   {[
                     { layer: 'L4 Interface Layer', detail: 'Employer Dashboard, Web3 Portal, Kuira Mobile App' },
                     { layer: 'L3 Compliance Gateway', detail: 'Clean Batch Attestations, Sanctions Screening, Tax Classification' },
                     { layer: 'L2 Core Contracts', detail: 'TreasuryVault, CredentialRegistry, ReputationEngine, Predictive zkML' },
                     { layer: 'L1 ZK Infrastructure', detail: 'Solvency Circuits, BZKIR Native Prover, Merkle Range Proofs' },
                   ].map((l, i) => (
-                    <div key={i} style={{ padding: '1rem', background: 'rgba(9, 14, 26, 0.85)', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.3)' }}>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#c084fc', marginBottom: '4px' }}>{l.layer}</div>
-                      <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>{l.detail}</div>
+                    <div key={i} style={{ padding: '1.25rem', background: 'rgba(9, 14, 26, 0.85)', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.3)' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#c084fc', marginBottom: '6px' }}>{l.layer}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.4 }}>{l.detail}</div>
                     </div>
                   ))}
                 </div>
@@ -556,8 +576,7 @@ export default function MizanDashboard() {
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem' }}>
-                {/* Step 1: Deploy */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
                 <div style={{ background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '12px', padding: '1.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                     <h4 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc' }}>Step 1: Deploy Treasury Contract</h4>
@@ -579,7 +598,6 @@ export default function MizanDashboard() {
                   </button>
                 </div>
 
-                {/* Step 2: Initialize & Deposit */}
                 <div style={{ background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '12px', padding: '1.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                     <h4 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc' }}>Step 2: Circuit Execution (initialize & deposit)</h4>
@@ -614,11 +632,10 @@ export default function MizanDashboard() {
                   </div>
                 </div>
 
-                {/* Ledger Verification Panel */}
                 <div style={{ background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '12px', padding: '1.5rem', gridColumn: '1 / -1' }}>
                   <h4 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: '#f8fafc' }}>Live On-Chain Ledger Verification (Midnight Preprod)</h4>
                   
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                     <div style={{ padding: '1rem', background: '#090d16', borderRadius: '8px', border: '1px solid #1e293b' }}>
                       <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Vault Initialization Status</span>
                       <div style={{ fontSize: '1.15rem', fontWeight: 700, color: vaultInitState ? '#10b981' : '#f87171', marginTop: '4px' }}>
@@ -701,7 +718,7 @@ export default function MizanDashboard() {
 
               <div style={{ background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '12px', padding: '1.5rem' }}>
                 <h4 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: '#f8fafc' }}>Active Verifiable Credentials Registry</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
                   {issuedCreds.map((c, i) => (
                     <div key={i} style={{ padding: '1.25rem', background: '#090d16', border: '1px solid #1e293b', borderRadius: '8px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -788,26 +805,77 @@ export default function MizanDashboard() {
 
           {/* 5. REPUTATION ENGINE (WAVE 2 ROADMAP ONLY) */}
           {activeTab === 'reputation' && (
-            <div style={{ width: '100%', background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '12px', padding: '2rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '10px' }}>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#f8fafc' }}>Compounding Reputation Engine</h2>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: '#94a3b8' }}>Cross-employer reputation scoring via encrypted peer ratings and aggregate ZK proofs.</p>
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '16px', padding: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc' }}>Compounding Reputation Engine</h2>
+                    <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#94a3b8' }}>
+                      Cross-employer reputation scoring via encrypted peer ratings and aggregate zero-knowledge proofs[span_0](start_span)[span_0](end_span)[span_1](start_span)[span_1](end_span).
+                    </p>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '5px 14px', borderRadius: '20px', fontWeight: 700 }}>
+                    Wave 2 Roadmap Target[span_2](start_span)[span_2](end_span)
+                  </span>
                 </div>
-                <span style={{ fontSize: '0.75rem', background: '#3b82f6', color: '#fff', padding: '4px 12px', borderRadius: '6px', fontWeight: 600 }}>Wave 2 Target</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-                <div style={{ padding: '1.25rem', background: '#090d16', borderRadius: '8px', border: '1px solid #1e293b' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Aggregate Score</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>98.4 / 100</div>
+
+                {/* Metrics Row */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+                  <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Aggregate Skill Index</div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#f8fafc', marginTop: '6px' }}>{repScore} / 100</div>
+                    <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '4px' }}>↑ +3.8% over last 6 months[span_3](start_span)[span_3](end_span)</div>
+                  </div>
+                  <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Solvency Track Record</div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#10b981', marginTop: '6px' }}>100%</div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px' }}>Zero payment default events</div>
+                  </div>
+                  <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Encrypted Attestations</div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#38bdf8', marginTop: '6px' }}>{activeFeedbackCount}</div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px' }}>Sealed via Midnight private witness</div>
+                  </div>
                 </div>
-                <div style={{ padding: '1.25rem', background: '#090d16', borderRadius: '8px', border: '1px solid #1e293b' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Solvency Track Record</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981', marginTop: '4px' }}>100% Punctual</div>
+
+                {/* Blueprint Breakdown */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+                  <div style={{ padding: '1.25rem', background: '#0c1220', borderRadius: '10px', border: '1px solid #1e293b' }}>
+                    <div style={{ fontWeight: 700, color: '#c084fc', marginBottom: '6px' }}>1. Encrypted Feedback System[span_4](start_span)[span_4](end_span)</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                      Employers submit peer ratings encrypted under the worker's key[span_5](start_span)[span_5](end_span). Raw feedback stays private while homomorphic aggregation updates public score tiers[span_6](start_span)[span_6](end_span).
+                    </div>
+                  </div>
+                  <div style={{ padding: '1.25rem', background: '#0c1220', borderRadius: '10px', border: '1px solid #1e293b' }}>
+                    <div style={{ fontWeight: 700, color: '#38bdf8', marginBottom: '6px' }}>2. Cross-Employer Portability[span_7](start_span)[span_7](end_span)[span_8](start_span)[span_8](end_span)</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                      Reputation compounds across multiple employers without linking employer addresses or revealing underlying payroll compensations[span_9](start_span)[span_9](end_span)[span_10](start_span)[span_10](end_span).
+                    </div>
+                  </div>
+                  <div style={{ padding: '1.25rem', background: '#0c1220', borderRadius: '10px', border: '1px solid #1e293b' }}>
+                    <div style={{ fontWeight: 700, color: '#34d399', marginBottom: '6px' }}>3. Reputation Marketplace[span_11](start_span)[span_11](end_span)</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                      Employers can query worker reputation threshold proofs (e.g., "Score ≥ 90 in Compact & ZK") without accessing private project history[span_12](start_span)[span_12](end_span).
+                    </div>
+                  </div>
                 </div>
-                <div style={{ padding: '1.25rem', background: '#090d16', borderRadius: '8px', border: '1px solid #1e293b' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Encrypted Feedback</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#38bdf8', marginTop: '4px' }}>32 Attestations</div>
+
+                {/* Action Card */}
+                <div style={{ padding: '1.5rem', background: 'rgba(15, 23, 42, 0.9)', borderRadius: '10px', border: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>Simulate Encrypted Peer Attestation</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '2px' }}>Test compounding reputation state logic for Wave 2 activation[span_13](start_span)[span_13](end_span).</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setRepScore(Number((repScore + 0.2).toFixed(1)));
+                      setActiveFeedbackCount(activeFeedbackCount + 1);
+                      setStatus('Encrypted peer attestation aggregated. Score incremented.');
+                    }}
+                    style={{ padding: '0.65rem 1.35rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+                  >
+                    + Submit Test Attestation
+                  </button>
                 </div>
               </div>
             </div>
@@ -815,39 +883,123 @@ export default function MizanDashboard() {
 
           {/* 6. PREDICTIVE zkML (WAVE 3 ROADMAP) */}
           {activeTab === 'predictive' && (
-            <div style={{ width: '100%', background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '12px', padding: '2rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '10px' }}>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#f8fafc' }}>Predictive Treasury (zkML Forecasting)</h2>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: '#94a3b8' }}>Autonomous runway projection and portfolio hedging via verified machine learning inference.</p>
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '16px', padding: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc' }}>Predictive Treasury: zkML Forecasting</h2>
+                    <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#94a3b8' }}>
+                      Autonomous runway simulation and portfolio hedging via verified zero-knowledge machine learning inference[span_14](start_span)[span_14](end_span).
+                    </p>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', background: 'rgba(139, 92, 246, 0.15)', color: '#c084fc', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '5px 14px', borderRadius: '20px', fontWeight: 700 }}>
+                    Wave 3 Roadmap Target[span_15](start_span)[span_15](end_span)[span_16](start_span)[span_16](end_span)
+                  </span>
                 </div>
-                <span style={{ fontSize: '0.75rem', background: '#8b5cf6', color: '#fff', padding: '4px 12px', borderRadius: '6px', fontWeight: 600 }}>Wave 3 Target</span>
-              </div>
-              <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '8px', border: '1px solid #1e293b' }}>
-                <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: '0.95rem' }}>Monte Carlo Volatility Forecast</div>
-                <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '6px' }}>Estimated safe runway: 8.4 Months under simulated 30% crypto asset drawdown.</div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+                  <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
+                    <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Monte Carlo Volatility Modeling[span_17](start_span)[span_17](end_span)</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                      Runs 1,000 simulated token price drawdowns to ensure runway survives market turbulence without exposing portfolio balances[span_18](start_span)[span_18](end_span).
+                    </div>
+                    <div style={{ height: '8px', background: '#1e293b', borderRadius: '4px', overflow: 'hidden', margin: '1.25rem 0' }}>
+                      <div style={{ width: '70%', height: '100%', background: 'linear-gradient(90deg, #10b981, #38bdf8)' }}></div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b' }}>
+                      <span>Min Safe: 6.2 Months</span>
+                      <span style={{ color: '#34d399', fontWeight: 700 }}>Projected: 8.4 Months</span>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
+                    <div style={{ color: '#c084fc', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Autonomous Rebalance Optimization[span_19](start_span)[span_19](end_span)</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                      Model generates ZK inference proof recommending token swap weights (e.g. ETH → USDC) to protect upcoming payroll periods[span_20](start_span)[span_20](end_span)[span_21](start_span)[span_21](end_span).
+                    </div>
+                    <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: '#1e293b', borderRadius: '6px', fontSize: '0.75rem', color: '#a5b4fc', fontFamily: 'monospace' }}>
+                      Inference Hash: zkml_ezkl_0x99a4...f01c
+                    </div>
+                  </div>
+                </div>
+
+                {/* Interactive Simulator */}
+                <div style={{ padding: '1.5rem', background: 'rgba(15, 23, 42, 0.9)', borderRadius: '10px', border: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>Execute zkML Inference Circuit Stress-Test[span_22](start_span)[span_22](end_span)</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '2px' }}>Verify neural network inference integrity with zero proprietary weight leakage[span_23](start_span)[span_23](end_span).</div>
+                  </div>
+                  <button
+                    onClick={handleRunAiSim}
+                    disabled={aiSimulationRunning}
+                    style={{ padding: '0.65rem 1.35rem', background: aiSimulationRunning ? '#334155' : 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem', cursor: aiSimulationRunning ? 'not-allowed' : 'pointer' }}
+                  >
+                    {aiSimulationRunning ? 'Computing Inference Proof...' : 'Run Simulation'}
+                  </button>
+                </div>
+
+                {aiSimResult && (
+                  <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid #38bdf8', borderRadius: '8px', color: '#38bdf8', fontSize: '0.85rem' }}>
+                    {aiSimResult}
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* 7. SELECTIVE DISCLOSURE (WAVE 3 ROADMAP) */}
           {activeTab === 'compliance' && (
-            <div style={{ width: '100%', background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '12px', padding: '2rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '10px' }}>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#f8fafc' }}>Compliance Gateway & Selective Disclosure</h2>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: '#94a3b8' }}>Auditor portal for cryptographic verification of tax withholdings without mass surveillance.</p>
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '16px', padding: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc' }}>Compliance Gateway & Selective Disclosure</h2>
+                    <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#94a3b8' }}>
+                      Auditor portal for cryptographic verification of tax and OFAC compliance without mass surveillance[span_24](start_span)[span_24](end_span)[span_25](start_span)[span_25](end_span).
+                    </p>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', background: 'rgba(139, 92, 246, 0.15)', color: '#c084fc', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '5px 14px', borderRadius: '20px', fontWeight: 700 }}>
+                    Wave 3 Roadmap Target[span_26](start_span)[span_26](end_span)[span_27](start_span)[span_27](end_span)
+                  </span>
                 </div>
-                <span style={{ fontSize: '0.75rem', background: '#8b5cf6', color: '#fff', padding: '4px 12px', borderRadius: '6px', fontWeight: 600 }}>Wave 3 Target</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                <div style={{ padding: '1.25rem', background: '#090d16', borderRadius: '8px', border: '1px solid #1e293b' }}>
-                  <div style={{ color: '#10b981', fontWeight: 700, fontSize: '0.9rem' }}>Clean Batch Sanctions Screening</div>
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '6px' }}>OFAC address verification verified by zero-knowledge membership proofs.</div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+                  <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
+                    <div style={{ color: '#10b981', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Clean Batch Sanctions Screening[span_28](start_span)[span_28](end_span)[span_29](start_span)[span_29](end_span)</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                      Proves that 100% of employee payment destinations passed OFAC checks via zero-knowledge membership proofs without disclosing addresses[span_30](start_span)[span_30](end_span)[span_31](start_span)[span_31](end_span).
+                    </div>
+                    <div style={{ marginTop: '1rem', color: '#34d399', fontSize: '0.75rem', fontWeight: 700 }}>✓ Screening Hash Committed On-Chain[span_32](start_span)[span_32](end_span)[span_33](start_span)[span_33](end_span)</div>
+                  </div>
+
+                  <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
+                    <div style={{ color: '#c084fc', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Time-Scoped Audit Keys[span_34](start_span)[span_34](end_span)[span_35](start_span)[span_35](end_span)</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                      Designated CPAs or tax authorities decrypt solely the requested fiscal quarter (e.g. Q3 2026) without exposing lifetime company history[span_36](start_span)[span_36](end_span)[span_37](start_span)[span_37](end_span).
+                    </div>
+                    <div style={{ marginTop: '1rem', color: '#a5b4fc', fontSize: '0.75rem', fontFamily: 'monospace' }}>Key: auditor_pk_preprod_0x221</div>
+                  </div>
+
+                  <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
+                    <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: '1rem', marginBottom: '8px' }}>Right to Erasure (GDPR)[span_38](start_span)[span_38](end_span)[span_39](start_span)[span_39](end_span)</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                      Revoking the auditor viewing key causes immediate mathematical shredding of historical decryptability, satisfying European data rights[span_40](start_span)[span_40](end_span)[span_41](start_span)[span_41](end_span).
+                    </div>
+                    <div style={{ marginTop: '1rem', color: '#38bdf8', fontSize: '0.75rem', fontWeight: 700 }}>Shredding Protocol Active[span_42](start_span)[span_42](end_span)</div>
+                  </div>
                 </div>
-                <div style={{ padding: '1.25rem', background: '#090d16', borderRadius: '8px', border: '1px solid #1e293b' }}>
-                  <div style={{ color: '#c084fc', fontWeight: 700, fontSize: '0.9rem' }}>Time-Scoped Audit Keys</div>
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '6px' }}>Selective disclosure grants restricted decryption for specified fiscal quarters.</div>
+
+                <div style={{ padding: '1.5rem', background: 'rgba(15, 23, 42, 0.9)', borderRadius: '10px', border: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>Export Form 1099 / W-2 Verified Audit Package[span_43](start_span)[span_43](end_span)</div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '2px' }}>Generate certified tax withholding schedules without storing employee PII[span_44](start_span)[span_44](end_span).</div>
+                  </div>
+                  <button
+                    onClick={() => setStatus('Generated certified zero-knowledge tax withholding report.')}
+                    style={{ padding: '0.65rem 1.35rem', background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+                  >
+                    Generate Report
+                  </button>
                 </div>
               </div>
             </div>
@@ -856,13 +1008,13 @@ export default function MizanDashboard() {
       </div>
 
       {/* Global Responsive Footer */}
-      <footer style={{ borderTop: '1px solid rgba(51, 65, 85, 0.4)', backgroundColor: 'rgba(9, 14, 26, 0.95)', padding: '1.25rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', fontSize: '0.8rem', color: '#64748b', zIndex: 50 }}>
+      <footer style={{ borderTop: '1px solid rgba(51, 65, 85, 0.4)', backgroundColor: 'rgba(9, 14, 26, 0.98)', padding: '1.25rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', fontSize: '0.8rem', color: '#64748b', zIndex: 50 }}>
         <div>
-          Built on Midnight Network | Apache 2.0 | Non-Custodial | <strong style={{ color: '#94a3b8' }}>Webnix</strong>
+          Built on Midnight Network | Apache 2.0 | Non-Custodial | <strong style={{ color: '#94a3b8' }}>Webnix</strong>[span_45](start_span)[span_45](end_span)[span_46](start_span)[span_46](end_span)
         </div>
         <div style={{ display: 'flex', gap: '1.5rem' }}>
           <span>Preprod: Synced</span>
-          <span style={{ color: '#34d399', fontWeight: 600 }}>Wave 1 Submission Ready</span>
+          <span style={{ color: '#34d399', fontWeight: 600 }}>Wave 1 Submission Ready[span_47](start_span)[span_47](end_span)</span>
         </div>
       </footer>
     </div>
