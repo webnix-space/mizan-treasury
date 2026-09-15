@@ -67,7 +67,7 @@ export default function MizanDashboard() {
   const [credRole, setCredRole] = useState<string>('Senior ZK Engineer');
   const [credDuration, setCredDuration] = useState<string>('6 Months');
   const [issuedCreds, setIssuedCreds] = useState<any[]>([
-    { id: 'CRED-001', role: 'Core Protocols Developer', duration: '12 Months', issuer: 'Webnix Foundation', hash: 'zk-cred:7e99b24...f8c1', verified: true },
+    { id: 'CRED-001', role: 'Core Protocols Developer', duration: '6 Months', issuer: 'Webnix Foundation', hash: 'zk-cred:7e99b24...f8c1', verified: true },
     { id: 'CRED-002', role: 'Treasury Risk Analyst', duration: '6 Months', issuer: 'Mizan DAO', hash: 'zk-cred:3a1d904...b84a', verified: true }
   ]);
   const [issuingCred, setIssuingCred] = useState<boolean>(false);
