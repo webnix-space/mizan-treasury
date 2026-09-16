@@ -1,6 +1,6 @@
 # Mizan (ميزان)
 
-> **Zero-Knowledge Workforce & Sovereign Treasury Platform**  
+> **Zero-Knowledge Workforce & Sovereign Treasury Platform**
 > *Where balance meets sovereign privacy — prove solvency without exposure, earn without surveillance.*
 
 Built natively on **Midnight Blockchain** | **Apache 2.0 License** | **Non-Custodial**
@@ -40,69 +40,81 @@ Mizan leverages Midnight's dual-ledger paradigm:
 2. **Private State:** Individual salary amounts, employee wallet destinations, and employer balance sheets maintained confidential off-chain.
 3. **ZK Proofs:** Proved client-side in the browser using the 1AM wallet provider and native binary `.bzkir` compilation.
 
-```text
-┌────────────────────────────────────────────────────────┐
-│                   L4 Interface Layer                   │
-│   Responsive Dashboard • 1AM Wallet • Credential Hub   │
-└───────────────────────────┬────────────────────────────┘
-                            │
-┌───────────────────────────▼────────────────────────────┐
-│                  L2 Compact Contracts                  │
-│       TreasuryVault • CredentialRegistry (Wave 1)      │
-│     ReputationEngine (Wave 2) • zkML Treasury (Wave 3) │
-└───────────────────────────┬────────────────────────────┘
-                            │
-┌───────────────────────────▼────────────────────────────┐
-│                 L1 ZK Proving Pipeline                 │
-│      Native .bzkir Circuits • Solvency Invariant       │
-│        Midnight Preprod Ledger & GraphQL Indexer       │
-└────────────────────────────────────────────────────────┘
+```
++--------------------------------------------------------+
+|                   L4 Interface Layer                   |
+|   Responsive Dashboard * 1AM Wallet * Credential Hub   |
++---------------------------+----------------------------+
+                            |
++---------------------------v----------------------------+
+|                  L2 Compact Contracts                  |
+|       TreasuryVault * CredentialRegistry (Wave 1)      |
+|     ReputationEngine (Wave 2) * zkML Treasury (Wave 3) |
++---------------------------+----------------------------+
+                            |
++---------------------------v----------------------------+
+|                 L1 ZK Proving Pipeline                 |
+|      Native .bzkir Circuits * Solvency Invariant       |
+|        Midnight Preprod Ledger & GraphQL Indexer       |
++--------------------------------------------------------+
+```
 
-4. Repository Structure
-├── contracts/
-│   ├── TreasuryVault.compact        # Primary Compact smart contract circuit
-│   └── managed/TreasuryVault/       # Auto-generated TypeScript contract bindings
-├── public/
-│   └── TreasuryVault/
-│       ├── zkir/                    # Binary .bzkir proving artifacts
-│       └── keys/                    # Prover & verifier keys
-├── src/
-│   ├── DeployPage.tsx               # 3D Dashboard & Midnight dApp connector
-│   └── main.tsx                     # Vite application entry point
-├── test/                            # Jest unit & circuit testing suite
-├── LICENSE                          # Apache License 2.0
-└── README.md                        # Documentation & submission dossier
+---
 
+## 4. Repository Structure
 
-5. Getting Started
-​Prerequisites
-​Node.js >= 18.0.0
-​Midnight 1AM Wallet browser extension configured to Preprod
+```
+contracts/
+  TreasuryVault.compact        # Primary Compact smart contract circuit
+  managed/TreasuryVault/       # Auto-generated TypeScript contract bindings
+public/
+  TreasuryVault/
+    zkir/                      # Binary .bzkir proving artifacts
+    keys/                      # Prover & verifier keys
+src/
+  DeployPage.tsx               # 3D Dashboard & Midnight dApp connector
+  main.tsx                     # Vite application entry point
+test/                          # Jest unit & circuit testing suite
+LICENSE                        # Apache License 2.0
+README.md                      # Documentation & submission dossier
+```
 
-Installation
-# Clone the repository
-git clone [https://github.com/webnix-space/mizan-treasury.git](https://github.com/webnix-space/mizan-treasury.git)
+---
+
+## 5. Getting Started
+
+### Prerequisites
+- Node.js >= 18.0.0
+- Midnight 1AM Wallet browser extension configured to **Preprod**
+
+### Installation
+```bash
+git clone https://github.com/webnix-space/mizan-treasury.git
 cd mizan-treasury
-
-# Install dependencies
 npm install
-
-# Run unit tests
 npm test
-
-# Run frontend development server
 npm run dev
+```
 
+---
 
-6. Multi-Wave Roadmap
-​Wave 1 (Complete): Core Payroll, TreasuryVault, Client-Side .bzkir Prover, ZK-Solvency Circuit, and Basic Credentials.
-​Wave 2 (Upcoming): Compounding Reputation Engine with encrypted peer ratings and aggregate ZK proofs.
-​Wave 3 (Upcoming): Predictive zkML Treasury runway modeling and Selective Disclosure auditor portal.
+## 6. Multi-Wave Roadmap
 
-7. Submission & Demo Links
-​Live Application: https://mizan-webnix.vercel.app
-​Video Walkthrough: https://www.youtube.com/watch?v=V06bvNEmm6I
+- **Wave 1 (Complete):** Core Payroll, TreasuryVault, Client-Side `.bzkir` Prover, ZK-Solvency Circuit, and Basic Credentials.
+- **Wave 2 (Upcoming):** Compounding Reputation Engine with encrypted peer ratings and aggregate ZK proofs.
+- **Wave 3 (Upcoming):** Predictive zkML Treasury runway modeling and Selective Disclosure auditor portal.
 
-8. License & Attribution
-​Built by Webnix under the Apache License 2.0.
-Designed for the Midnight Buildathon.
+---
+
+## 7. Submission & Demo Links
+
+- **Live Application:** https://mizan-webnix.vercel.app
+- **Video Walkthrough:** https://www.youtube.com/watch?v=V06bvNEmm6I
+- **Source Code:** https://github.com/webnix-space/mizan-treasury
+
+---
+
+## 8. License & Attribution
+
+Built by **Webnix** under the **Apache License 2.0**.  
+Designed for the **Midnight Buildathon**.
