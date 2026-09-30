@@ -193,7 +193,7 @@ export default function MizanDashboard() {
 
       const workerSecret = new Uint8Array(32).fill(42);
       const witnesses = {
-        workerSecretKey: () => workerSecret,
+        workerSecretKey: (context: any) => [context.privateState, workerSecret],
       };
 
       // Generate SHA-256 nullifier binding
