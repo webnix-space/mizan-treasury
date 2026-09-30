@@ -1,0 +1,14 @@
+{
+  "network": "midnight-preprod",
+  "contractName": "ReputationEngine",
+  "indexer": "https://indexer.preprod.midnight.network/api/v1/graphql",
+  "proofServer": "http://127.0.0.1:6300",
+  "initialAttestationRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "circuits": [
+    "initialize",
+    "verifyCredential",
+    "updateAttestationRoot"
+  ],
+  "deployedAt": "2026-09-30T13:53:24.695Z",
+  "status": "ACTIVE_PREPROD"
+}

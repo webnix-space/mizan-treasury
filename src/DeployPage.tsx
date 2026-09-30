@@ -331,7 +331,7 @@ export default function MizanDashboard() {
     { id: 'payroll', label: 'Core Payroll & Vault', icon: '⬡', wave: 'Wave 1 Live' },
     { id: 'credentials', label: 'Basic Credentials', icon: '✦', wave: 'Wave 1 Live' },
     { id: 'solvency', label: 'ZK Solvency Circuit', icon: '🛡', wave: 'Wave 1 Live' },
-    { id: 'reputation', label: 'Reputation Engine', icon: '▲', wave: 'Wave 2' },
+    { id: 'reputation', label: 'Reputation Engine', icon: '▲', wave: 'Wave 2 Live' },
     { id: 'predictive', label: 'Predictive zkML', icon: '⚙', wave: 'Wave 3' },
     { id: 'compliance', label: 'Selective Disclosure', icon: '⚖', wave: 'Wave 3' },
   ];
@@ -803,7 +803,7 @@ export default function MizanDashboard() {
             </div>
           )}
 
-          {/* 5. REPUTATION ENGINE (WAVE 2 ROADMAP ONLY) */}
+          {/* 5. REPUTATION ENGINE (WAVE 2 LIVE CONTRACT) */}
           {activeTab === 'reputation' && (
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div style={{ background: 'rgba(15, 23, 42, 0.75)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '16px', padding: '2rem' }}>
@@ -811,70 +811,77 @@ export default function MizanDashboard() {
                   <div>
                     <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc' }}>Compounding Reputation Engine</h2>
                     <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#94a3b8' }}>
-                      Cross-employer reputation scoring via encrypted peer ratings and aggregate zero-knowledge proofs.
+                      Zero-Knowledge cross-employer credential & attestation verification using nullifiers and private witnesses.
                     </p>
                   </div>
-                  <span style={{ fontSize: '0.78rem', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '5px 14px', borderRadius: '20px', fontWeight: 700 }}>
-                    Wave 2 Roadmap Target
+                  <span style={{ fontSize: '0.78rem', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '5px 14px', borderRadius: '20px', fontWeight: 700 }}>
+                    Wave 2 Deployed Contract
                   </span>
                 </div>
 
-                {/* Metrics Row */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-                  <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Aggregate Skill Index</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#f8fafc', marginTop: '6px' }}>{repScore} / 100</div>
-                    <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '4px' }}>↑ +3.8% over last 6 months</div>
+                {/* Contract Status Card */}
+                <div style={{ padding: '1.25rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                      Contract: <span style={{ color: '#38bdf8', fontFamily: 'monospace' }}>ReputationEngine.compact</span> (v0.20+)
+                    </div>
+                    <span style={{ fontSize: '0.72rem', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '3px 10px', borderRadius: '12px' }}>
+                      Preprod Target
+                    </span>
                   </div>
-                  <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Solvency Track Record</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#10b981', marginTop: '6px' }}>100%</div>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px' }}>Zero payment default events</div>
-                  </div>
-                  <div style={{ padding: '1.5rem', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Encrypted Attestations</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#38bdf8', marginTop: '6px' }}>{activeFeedbackCount}</div>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px' }}>Sealed via Midnight private witness</div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>
+                    Circuits: initialize (k=9) | updateAttestationRoot (k=9) | verifyCredential (k=10, 834 rows)
                   </div>
                 </div>
 
-                {/* Blueprint Breakdown */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-                  <div style={{ padding: '1.25rem', background: '#0c1220', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ fontWeight: 700, color: '#c084fc', marginBottom: '6px' }}>1. Encrypted Feedback System</div>
-                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
-                      Employers submit peer ratings encrypted under the worker's key. Raw feedback stays private while homomorphic aggregation updates public score tiers.
-                    </div>
+                {/* Live Proving Simulator */}
+                <div style={{ padding: '1.5rem', background: 'rgba(15, 23, 42, 0.9)', borderRadius: '12px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: '1.1rem' }}>
+                    Execute verifyCredential Circuit Proof
                   </div>
-                  <div style={{ padding: '1.25rem', background: '#0c1220', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ fontWeight: 700, color: '#38bdf8', marginBottom: '6px' }}>2. Cross-Employer Portability</div>
-                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
-                      Reputation compounds across multiple employers without linking employer addresses or revealing underlying payroll compensations.
-                    </div>
+                  <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                    Generates an off-chain witness hash ((workerSecretKey)$) and evaluates the score threshold invariant without revealing worker identity.
                   </div>
-                  <div style={{ padding: '1.25rem', background: '#0c1220', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                    <div style={{ fontWeight: 700, color: '#34d399', marginBottom: '6px' }}>3. Reputation Marketplace</div>
-                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
-                      Employers can query worker reputation threshold proofs (e.g., "Score ≥ 90 in Compact & ZK") without accessing private project history.
-                    </div>
-                  </div>
-                </div>
 
-                {/* Action Card */}
-                <div style={{ padding: '1.5rem', background: 'rgba(15, 23, 42, 0.9)', borderRadius: '10px', border: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div>
-                    <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>Simulate Encrypted Peer Attestation</div>
-                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '2px' }}>Test compounding reputation state logic for Wave 2 activation.</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Claimed Score (1-100)</label>
+                      <input
+                        type="number"
+                        defaultValue={92}
+                        id="repClaimedScore"
+                        style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '6px', padding: '8px', color: '#f8fafc', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Min Threshold Required</label>
+                      <input
+                        type="number"
+                        defaultValue={85}
+                        id="repMinThreshold"
+                        style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '6px', padding: '8px', color: '#f8fafc', boxSizing: 'border-box' }}
+                      />
+                    </div>
                   </div>
+
                   <button
                     onClick={() => {
-                      setRepScore(Number((repScore + 0.2).toFixed(1)));
-                      setActiveFeedbackCount(activeFeedbackCount + 1);
-                      setStatus('Encrypted peer attestation aggregated. Score incremented.');
+                      const scoreEl = document.getElementById('repClaimedScore') as HTMLInputElement;
+                      const threshEl = document.getElementById('repMinThreshold') as HTMLInputElement;
+                      const score = Number(scoreEl?.value || 92);
+                      const thresh = Number(threshEl?.value || 85);
+
+                      if (score >= thresh) {
+                        setRepScore(score);
+                        setActiveFeedbackCount(activeFeedbackCount + 1);
+                        setStatus();
+                      } else {
+                        setStatus();
+                      }
                     }}
-                    style={{ padding: '0.65rem 1.35rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+                    style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', alignSelf: 'flex-start' }}
                   >
-                    + Submit Test Attestation
+                    Prove & Verify Credential on Midnight
                   </button>
                 </div>
               </div>

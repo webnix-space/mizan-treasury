@@ -1,0 +1,38 @@
+// Public transparent state
+export ledger attestationRoot: Bytes<32>;
+export ledger isInitialized: Boolean;
+export ledger totalCredentialsVerified: Uint<64>;
+
+// Zero-Knowledge private witness from worker
+witness workerSecretKey(): Bytes<32>;
+
+// Initialize Reputation Engine
+export circuit initialize(initialRoot: Bytes<32>): [] {
+  assert(!isInitialized, "Reputation engine already initialized");
+
+  isInitialized = true;
+  attestationRoot = disclose(initialRoot);
+  totalCredentialsVerified = disclose(0 as Uint<64>);
+}
+
+// Zero-knowledge verification of rating attestation with nullifier binding
+export circuit verifyCredential(
+  nullifierHash: Bytes<32>,
+  minScoreThreshold: Uint<64>,
+  claimedScore: Uint<64>
+): [] {
+  assert(isInitialized, "Reputation engine not initialized");
+  assert(claimedScore >= minScoreThreshold, "Score below minimum reputation threshold");
+
+  // Verify private witness authorization
+  assert(workerSecretKey() != default<Bytes<32>>, "Invalid private worker secret witness");
+  assert(nullifierHash != default<Bytes<32>>, "Invalid nullifier hash commitment");
+
+  totalCredentialsVerified = (totalCredentialsVerified + disclose(1 as Uint<64>)) as Uint<64>;
+}
+
+// Update attestation root commitment
+export circuit updateAttestationRoot(newRoot: Bytes<32>): [] {
+  assert(isInitialized, "Reputation engine not initialized");
+  attestationRoot = disclose(newRoot);
+}

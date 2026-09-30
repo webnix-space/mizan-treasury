@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "file": "index.js",
+  "sourceRoot": "../../../../",
+  "sources": ["contracts/ReputationEngine.compact"],
+  "names": [],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;EACA;;;;;;;;;;;;;MAQA,AAAA,UAMC;;;;;cANyB,aAAsB;;;;;;;;;;;;;;;;;;yCAAtB,aAAsB;;;;;;;;;4CAAtB,aAAsB;;;OAM/C;MAGD,AAAA,gBAaC;;;;;cAZC,eAAwB;cACxB,mBAA2B;cAC3B,cAAsB;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;yCAFtB,eAAwB,+BACxB,mBAA2B,+BAC3B,cAAsB;;;;;;;;;kDAFtB,eAAwB;kDACxB,mBAA2B;kDAC3B,cAAsB;;;OAUvB;MAGD,AAAA,qBAGC;;;;;cAHoC,SAAkB;;;;;;;;;;;;;;;;;;yCAAlB,SAAkB;;;;;;;;;uDAAlB,SAAkB;;;OAGtD;;;;;;;;;;;;GACA;EArCD;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;IAAA;;;;;;;;;yEAAyC;IACzC;;;;;;;;;yEAAqC;IACrC;;;;;;;;;yEAAiD;;;;;;;GAmChD;EAhCD,AAAA,kBAAqC;;0DAArC,eAAqC;;;;;;;;;;;;;;GAAA;EAGrC,AAAA,aAMC,4BANyB,aAAsB;qDACtC;;;;;;;;;;;0HAAa;;IAErB;;;;;;;;;yEAAa;IACb;;;;;;;2HAA2B,aAAW;;yEAAvB;UACf,KAAwB;IAAxB;;;;;;;2HAAA,KAAwB;;yEAAA;;GACzB;EAGD,AAAA,mBAaC;;sBAZC,eAAwB;sBACxB,mBAA2B;sBAC3B,cAAsB;;oDAEf;;;;;;;;;;;yHAAa;;4BACb,cAAY,IAAI,mBAAiB;;;;;;2CAIjC,eAAa;;UAEpB,KAAwB;;;;;6CAAI;;;;;;;;;;;kHAAwB;;;IAApD;;;;;;;2HAAA,KAAwB;;yEAAA;;GACzB;EAGD,AAAA,wBAGC,4BAHoC,SAAkB;oDAC9C;;;;;;;;;;;yHAAa;;IACpB;;;;;;;2HAA2B,SAAO;;yEAAnB;;GAChB;;;;;;;;;;;;;;;;;;;;;;;;IApCD;qCAAA;;;;;;;;;;;0GAAyC;KAAA;IACzC;qCAAA;;;;;;;;;;;0GAAqC;KAAA;IACrC;qCAAA;;;;;;;;;;;0GAAiD;KAAA;;;;;;;;;;;;"
+}
