@@ -21,7 +21,27 @@ Built natively on **Midnight Blockchain** | **Apache 2.0 License** | **Non-Custo
 
 ---
 
-## 2. Wave 1 Live Deliverables (Midnight Preprod)
+## 2. Wave 2 Deliverables: Compounding Reputation Engine & ZK Proving Runtime
+
+In Wave 2, Mizan expanded from core sovereign payroll into verifiable self-sovereign reputation and on-chain credential evaluation.
+
+### Architecture Deliverables:
+- **ReputationEngine.compact (v0.2.0):**
+  - Zero-knowledge cross-employer credential evaluation written in Compact.
+  - Provable circuits:
+    - `initialize(initialRoot: Bytes<32>)` — Binds the cryptographic attestation root.
+    - `verifyCredential(nullifierHash: Bytes<32>, minScoreThreshold: Uint<64>, claimedScore: Uint<64>)` — Proves score compliance (=10$, 834 rows) while enforcing nullifier replay protection ((\text{workerSecretKey})$).
+    - `updateAttestationRoot(newRoot: Bytes<32>)` — Sovereign root rotation mechanism.
+- **Client-Side WASM Prover Integration:**
+  - Browser-native key material fetching (`.bzkir`, `.prover`, `.verifier`) dynamic binding.
+  - Real-time witness tuple generation (`[context.privateState, workerSecret]`) satisfying Compact 0.16 runtime specifications.
+- **1AM Wallet Provider Integration:**
+  - Direct integration with 1AM Wallet on Midnight Preprod network (`https://indexer.preprod.midnight.network/api/v1/graphql`).
+  - Off-chain proof generation pipeline with deterministic nullifier derivation.
+
+---
+
+## 3. Wave 1 Live Deliverables (Midnight Preprod)
 
 All Wave 1 technical requirements have been deployed, initialized, and verified on the **Midnight Preprod Network**:
 
