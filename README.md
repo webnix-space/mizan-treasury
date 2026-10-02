@@ -30,7 +30,7 @@ In Wave 2, Mizan expanded from core sovereign payroll into verifiable self-sover
   - Zero-knowledge cross-employer credential evaluation written in Compact.
   - Provable circuits:
     - `initialize(initialRoot: Bytes<32>)` — Binds the cryptographic attestation root.
-    - `verifyCredential(nullifierHash: Bytes<32>, minScoreThreshold: Uint<64>, claimedScore: Uint<64>)` — Proves score compliance (=10$, 834 rows) while enforcing nullifier replay protection ((\text{workerSecretKey})$).
+    - `verifyCredential(nullifierHash: Bytes<32>, minScoreThreshold: Uint<64>, claimedScore: Uint<64>)` — Proves score compliance ($k=10$, 834 rows) while enforcing nullifier replay protection ($sha256(\text{workerSecretKey})$).
     - `updateAttestationRoot(newRoot: Bytes<32>)` — Sovereign root rotation mechanism.
 - **Client-Side WASM Prover Integration:**
   - Browser-native key material fetching (`.bzkir`, `.prover`, `.verifier`) dynamic binding.
